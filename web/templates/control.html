@@ -76,8 +76,12 @@
 <body>
     <h1>Robot Control</h1>
 
-    <div class="mode-selector" style="margin-bottom: 20px;">
+    <div class="mode-selector" style="margin-bottom: 20px; display: flex; gap: 15px;">
         <button id="modeToggleBtn" class="btn primary" onclick="toggleControlMode()" style="padding: 10px 20px; font-size: 16px;">Switch to Buttons</button>
+        <select id="connectionMode" class="btn" onchange="toggleConnectionMode()" style="padding: 10px; font-size: 16px; background-color: #333; color: white;">
+            <option value="serial">Case A: Serial (Pi)</option>
+            <option value="wifi">Case B: Wi-Fi Direct</option>
+        </select>
     </div>
     
     <div id="joystick-container">
@@ -141,29 +145,79 @@
             }
         }
 
+        let connectionType = 'serial';
+        let ws = null;
+
+        function toggleConnectionMode() {
+            connectionType = document.getElementById('connectionMode').value;
+            const statusBox = document.getElementById('statusBox');
+            
+            if (connectionType === 'wifi') {
+                statusBox.textContent = 'Connecting to ESP32 WebSocket...';
+                connectWebSocket();
+            } else {
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+                statusBox.textContent = 'Switched to Serial Mode';
+            }
+        }
+
+        function connectWebSocket() {
+            // ESP32 IP address when acting as AP
+            ws = new WebSocket('ws://192.168.4.1:81/ws');
+            
+            ws.onopen = function() {
+                document.getElementById('statusBox').textContent = 'WebSocket Connected (Case B)';
+            };
+            
+            ws.onclose = function() {
+                if (connectionType === 'wifi') {
+                    document.getElementById('statusBox').textContent = 'WebSocket Disconnected! Retrying...';
+                    setTimeout(connectWebSocket, 2000);
+                }
+            };
+            
+            ws.onerror = function(err) {
+                document.getElementById('statusBox').textContent = 'WebSocket Error!';
+                console.error('WS Error:', err);
+            };
+        }
+
         function sendCommand(cmd) {
             const statusBox = document.getElementById('statusBox');
-            statusBox.textContent = `Sending: ${cmd}...`;
             
-            fetch('/api/command', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ command: cmd })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    statusBox.textContent = `Command sent: ${cmd}`;
+            if (connectionType === 'wifi') {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(cmd);
+                    statusBox.textContent = `Sent (WS): ${cmd}`;
                 } else {
-                    statusBox.textContent = `Error: ${data.error}`;
+                    statusBox.textContent = `WS Not connected. Cannot send: ${cmd}`;
                 }
-            })
-            .catch(error => {
-                statusBox.textContent = `Network Error!`;
-                console.error('Error:', error);
-            });
+            } else {
+                // Serial (HTTP API) Mode
+                statusBox.textContent = `Sending: ${cmd}...`;
+                fetch('/api/command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command: cmd })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        statusBox.textContent = `Command sent (HTTP): ${cmd}`;
+                    } else {
+                        statusBox.textContent = `Error: ${data.error}`;
+                    }
+                })
+                .catch(error => {
+                    statusBox.textContent = `Network Error!`;
+                    console.error('Error:', error);
+                });
+            }
         }
         
         // Joystick support
