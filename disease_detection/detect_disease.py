@@ -68,15 +68,20 @@ def main():
         logger.error(f"Failed to load model from {model_path}: {e}")
         return
 
-    camera_index = config['camera'].get('index', 0)
-    cap = cv2.VideoCapture(camera_index)
+    cam_type = config['camera'].get('type', 'usb')
+    if cam_type == 'ip':
+        cam_source = config['camera'].get('ip_url', '')
+    else:
+        cam_source = config['camera'].get('index', 0)
+
+    cap = cv2.VideoCapture(cam_source)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, config['camera']['width'])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config['camera']['height'])
     if 'fps' in config['camera']:
         cap.set(cv2.CAP_PROP_FPS, config['camera']['fps'])
 
     if not cap.isOpened():
-        logger.error(f"Failed to open the webcam (index {camera_index}).")
+        logger.error(f"Failed to open the webcam ({cam_type}: {cam_source}).")
         return
         
     logger.info("Webcam opened successfully.")

@@ -1,5 +1,7 @@
 camera:
+  type: "usb" # Change to "ip" to use an IP camera
   index: 0
+  ip_url: "http://192.168.1.100:8080/video" # Update with the URL from your IP camera app
   width: 640
   height: 480
   fps: 30
