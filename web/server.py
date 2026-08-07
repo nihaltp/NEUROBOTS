@@ -181,10 +181,6 @@ def send_command(command):
     else:
         return {'error': f'Unknown connection case {connection_case}'}, 400
 
-def pump_off_delayed(pump_id, delay):
-    time.sleep(delay)
-    logger.info(f"Turning off pump {pump_id} after {delay} seconds")
-    send_command(f"P{pump_id}:0")
 
 def detection_listener():
     """Background task to listen for detections and push to clients."""
@@ -210,16 +206,6 @@ def detection_listener():
                     disease_counts[class_name] = disease_counts.get(class_name, 0) + 1
                     logger.info(f"New instance of {class_name} detected. Total count: {total_diseases_detected}")
                     
-                    # Check pump mapping
-                    pump_mapping = config.get('pump_control', {}).get('mapping', {})
-                    if class_name in pump_mapping:
-                        pump_id = pump_mapping[class_name]
-                        durations = config.get('pump_control', {}).get('durations', {})
-                        duration = durations.get(pump_id, durations.get(str(pump_id), 3.0))
-                        
-                        logger.info(f"Automated action: Turning on pump {pump_id} for {duration} seconds for disease {class_name}")
-                        send_command(f"P{pump_id}:1")
-                        threading.Thread(target=pump_off_delayed, args=(pump_id, duration), daemon=True).start()
                 
                 # Always update last_seen if detected in this frame
                 active_detections[class_name] = current_time
