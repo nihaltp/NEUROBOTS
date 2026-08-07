@@ -83,25 +83,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (detections.length > 0) {
             detectionList.innerHTML = ''; // clear empty state
             
-            detections.forEach(det => {
-                const box = det.bbox;
+            detections.forEach((det, index) => {
                 const className = det.class_name;
                 const conf = (det.confidence * 100).toFixed(1) + '%';
                 
-                // Draw Box
-                ctx.strokeStyle = '#2ecc71';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(box.x_min, box.y_min, box.x_max - box.x_min, box.y_max - box.y_min);
-                
-                // Draw Label Background
-                ctx.fillStyle = '#2ecc71';
-                ctx.fillRect(box.x_min, box.y_min - 25, 200, 25);
+                // Draw the text at the top left of the canvas.
+                const yPos = 30 + (index * 30);
                 
                 // Draw Label Text
-                ctx.fillStyle = '#000';
-                ctx.font = '16px Inter, sans-serif';
+                ctx.fillStyle = '#2ecc71';
+                ctx.font = '20px Inter, sans-serif';
                 ctx.fontWeight = 'bold';
-                ctx.fillText(`${className} ${conf}`, box.x_min + 5, box.y_min - 7);
+                ctx.fillText(`${className}: ${conf}`, 10, yPos);
                 
                 // Update UI list
                 const item = document.createElement('div');
