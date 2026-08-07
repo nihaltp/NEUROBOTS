@@ -106,7 +106,8 @@
     
     <h3>Pump Controls</h3>
     <div class="pump-controls">
-        <button class="btn primary" id="pumpToggleBtn" onclick="togglePump()">Pump ON</button>
+        <button class="btn primary" id="pump1ToggleBtn" onclick="togglePump(1)">Pump 1 ON</button>
+        <button class="btn primary" id="pump2ToggleBtn" onclick="togglePump(2)">Pump 2 ON</button>
     </div>
 
     <div class="status" id="statusBox">Status: Ready</div>
@@ -133,18 +134,32 @@
             }
         }
 
-        let pumpState = false;
-        function togglePump() {
-            pumpState = !pumpState;
-            const btn = document.getElementById('pumpToggleBtn');
-            if (pumpState) {
-                sendCommand('P1');
-                btn.textContent = 'Pump OFF';
+        let pump1State = false;
+        let pump2State = false;
+        function togglePump(pumpId) {
+            let state, btn, cmdOn, cmdOff;
+            if (pumpId === 1) {
+                pump1State = !pump1State;
+                state = pump1State;
+                btn = document.getElementById('pump1ToggleBtn');
+                cmdOn = 'P1:1';
+                cmdOff = 'P1:0';
+            } else {
+                pump2State = !pump2State;
+                state = pump2State;
+                btn = document.getElementById('pump2ToggleBtn');
+                cmdOn = 'P2:1';
+                cmdOff = 'P2:0';
+            }
+            
+            if (state) {
+                sendCommand(cmdOn);
+                btn.textContent = `Pump ${pumpId} OFF`;
                 btn.classList.remove('primary');
                 btn.classList.add('danger');
             } else {
-                sendCommand('P0');
-                btn.textContent = 'Pump ON';
+                sendCommand(cmdOff);
+                btn.textContent = `Pump ${pumpId} ON`;
                 btn.classList.remove('danger');
                 btn.classList.add('primary');
             }
