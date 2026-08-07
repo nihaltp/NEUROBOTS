@@ -119,11 +119,11 @@ def main():
         while True:
             # Check if any process died
             if server_process.poll() is not None:
-                logger.error("Web server process terminated unexpectedly.")
-                break
+                logger.error("Web server process terminated unexpectedly. Restarting...")
+                server_process = subprocess.Popen([sys.executable, "web/server.py"], env=env, **kwargs)
             if detection_process.poll() is not None:
-                logger.error("Detection process terminated unexpectedly.")
-                break
+                logger.error("Detection process terminated unexpectedly. Restarting...")
+                detection_process = subprocess.Popen([sys.executable, "disease_detection/detect_disease.py"], **kwargs)
             time.sleep(1)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down...")
