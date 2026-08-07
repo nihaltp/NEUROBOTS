@@ -158,6 +158,7 @@ def main():
                 time.sleep(1)
                 continue
                 
+            display_frame = frame.copy() if args.show else None
             frame_detections = []
             
             if detection_enabled:
@@ -188,14 +189,14 @@ def main():
                     
                     if args.show:
                         label = f"{disp_class_name}: {disp_conf:.2f}"
-                        cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                        cv2.putText(display_frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
                 
                 elif args.show:
                     # Show top prediction even below threshold (in red)
                     class_name = labels.get(top_idx, f"Unknown ({top_idx})")
                     if "Tomato" in class_name:
                         label = f"{class_name}: {top_conf:.2f} (low)"
-                        cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                        cv2.putText(display_frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
                 if args.debug:
                     # Log top 3 predictions
@@ -217,7 +218,7 @@ def main():
             frame_pub.send(buffer.tobytes())
             
             if args.show:
-                cv2.imshow('Plant Disease Classification', frame)
+                cv2.imshow('Plant Disease Classification', display_frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
