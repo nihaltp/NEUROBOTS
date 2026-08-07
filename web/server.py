@@ -211,6 +211,17 @@ def index():
 def control():
     return render_template('control.html')
 
+@app.route('/api/set_connection', methods=['POST'])
+def set_connection():
+    global connection_case
+    data = request.json
+    mode = data.get('mode', 'a')
+    if mode in ['a', 'b']:
+        connection_case = mode
+        logger.info(f"Connection mode changed to: {mode}")
+        return jsonify({'status': 'success', 'mode': mode})
+    return jsonify({'error': 'Invalid mode'}), 400
+
 @app.route('/api/command', methods=['POST'])
 def handle_command():
     data = request.json
