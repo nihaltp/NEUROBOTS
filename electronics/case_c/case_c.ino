@@ -23,12 +23,12 @@ static NimBLECharacteristic* pCommandChar = nullptr;
 static NimBLECharacteristic* pStatusChar = nullptr;
 
 class ServerCallbacks : public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer* pServer) {
+    void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override {
         Serial.println("BLE Client Connected");
         NimBLEDevice::startAdvertising(); // Allow multiple connections or just continue advertising
     }
 
-    void onDisconnect(NimBLEServer* pServer) {
+    void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override {
         Serial.println("BLE Client Disconnected");
         // Stop motors when disconnected for safety
         stopMotors();
@@ -41,7 +41,7 @@ class ServerCallbacks : public NimBLEServerCallbacks {
 };
 
 class CommandCallbacks : public NimBLECharacteristicCallbacks {
-    void onWrite(NimBLECharacteristic* pCharacteristic) {
+    void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override {
         std::string rxValue = pCharacteristic->getValue();
         if (rxValue.length() > 0) {
             String command = String(rxValue.c_str());
