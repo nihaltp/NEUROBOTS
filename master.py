@@ -15,7 +15,12 @@ from config_loader import load_config
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("Master")
 
+shutting_down = False
+
 def send_command(command):
+    global shutting_down
+    if shutting_down and command != "STOPALL":
+        return
     try:
         response = requests.post('http://127.0.0.1:5000/api/command', json={'command': command}, timeout=2)
         if response.status_code == 200:
@@ -128,8 +133,13 @@ def main():
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down...")
     finally:
+        global shutting_down
+        shutting_down = True
         logger.info("Sending HALT ALL command to rover before shutdown...")
         while True:
+            if server_process.poll() is not None:
+                logger.error("Web server process is dead, cannot send STOPALL.")
+                break
             try:
                 logger.info("Requesting STOPALL...")
                 response = requests.post('http://127.0.0.1:5000/api/command', json={'command': "STOPALL"}, timeout=2)
@@ -138,9 +148,18 @@ def main():
                     break
                 else:
                     logger.warning("Failed to get ACK, retrying...")
+            except KeyboardInterrupt:
+                logger.info("Force quit requested during shutdown. Exiting immediately.")
+                break
             except Exception as e:
                 logger.error(f"Error sending STOPALL: {e}")
-            time.sleep(1)
+            
+            try:
+                time.sleep(1)
+            except KeyboardInterrupt:
+                logger.info("Force quit requested during shutdown. Exiting immediately.")
+                break
+        
         logger.info("Terminating subprocesses...")
         server_process.terminate()
         detection_process.terminate()
