@@ -23,12 +23,12 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
                       void *arg, uint8_t *data, size_t len) {
     switch (type) {
         case WS_EVT_CONNECT:
-            Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+            Serial.printf("WebSocket client #%lu connected from %s\n", (long unsigned int)client->id(), client->remoteIP().toString().c_str());
             break;
         case WS_EVT_DISCONNECT:
-            Serial.printf("WebSocket client #%u disconnected\n", client->id());
+            Serial.printf("WebSocket client #%lu disconnected\n", (long unsigned int)client->id());
             break;
-        case WS_EVT_DATA:
+        case WS_EVT_DATA: {
             AwsFrameInfo *info = (AwsFrameInfo*)arg;
             if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
                 data[len] = 0;
@@ -39,6 +39,7 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
                 processCommand(command);
             }
             break;
+        }
         case WS_EVT_PONG:
         case WS_EVT_ERROR:
             break;
