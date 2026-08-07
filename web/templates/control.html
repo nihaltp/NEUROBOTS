@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Robot Control Interface</title>
     <script src="{{ url_for('static', filename='js/nipplejs.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/socket.io.js') }}"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -81,6 +82,7 @@
         <select id="connectionMode" class="btn" onchange="toggleConnectionMode()" style="padding: 10px; font-size: 16px; background-color: #333; color: white;">
             <option value="a">Case A: Serial</option>
             <option value="b">Case B: Wi-Fi</option>
+            <option value="c">Case C: BLE</option>
         </select>
     </div>
     
@@ -118,6 +120,12 @@
     </div>
 
     <script>
+        const socket = io();
+        
+        socket.on('ble_log', function(data) {
+            appendToLog(`<- BLE Status: ${data.text}`);
+        });
+
         let currentMode = 'joystick';
         function toggleControlMode() {
             const btn = document.getElementById('modeToggleBtn');

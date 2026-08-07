@@ -1,3 +1,4 @@
 {
-    "https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js": "js/nipplejs.min.js"
+    "https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js": "js/nipplejs.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js": "js/socket.io.js"
 }

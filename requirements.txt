@@ -5,3 +5,4 @@ flask-socketio
 pyzmq
 pyyaml
 pyserial
+bleak

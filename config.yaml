@@ -42,3 +42,10 @@ pump_control:
   durations:
     1: 1.5
     2: 3.0
+
+ble:
+  device_name: "NeuroBot"
+  service_uuid: "3d0cf6a3-5f45-43b5-9d5b-5baf86d8a7b1"
+  command_char_uuid: "d5f8a0cd-ec8a-4e48-b60d-3277a0afbd45"
+  status_char_uuid: "4d869ab8-f78c-4e9f-aee5-73452e0a5e3d"
+

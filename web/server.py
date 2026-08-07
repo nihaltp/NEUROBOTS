@@ -13,6 +13,7 @@ import threading
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config_loader import load_config
 from shared.wifi_comms import WiFiComms
+from shared.ble_comms import BLEComms
 
 config = load_config()
 log_level_str = config.get('logging', {}).get('level', 'INFO').upper()
@@ -37,6 +38,7 @@ connection_case = config.get('connection_case', 'b').lower()
 wifi_comms = None
 ser = None
 serial_lock = threading.Lock()
+ble_comms = None
 
 # Always initialize Serial
 serial_port = config.get('serial', {}).get('port', 'COM3')
@@ -57,6 +59,24 @@ try:
     logger.info(f"WiFi Comms initialized. Target ESP32: {esp_ip}:{esp_port}")
 except Exception as e:
     logger.error(f"Failed to initialize WiFi Comms: {e}")
+
+# Initialize BLE if starting in case 'c'
+def ble_ack_callback(payload):
+    socketio.emit('ble_log', {'text': payload})
+
+ble_config = config.get('ble', {})
+if ble_config and connection_case == 'c':
+    try:
+        ble_comms = BLEComms(
+            device_name=ble_config.get('device_name', 'NeuroBot'),
+            service_uuid=ble_config.get('service_uuid'),
+            command_char_uuid=ble_config.get('command_char_uuid'),
+            status_char_uuid=ble_config.get('status_char_uuid'),
+            ack_callback=ble_ack_callback
+        )
+        logger.info("BLE Comms initialized in background thread.")
+    except Exception as e:
+        logger.error(f"Failed to initialize BLE Comms: {e}")
 
 # ZMQ Context
 context = zmq.Context()
@@ -113,7 +133,7 @@ def send_command(command):
         else:
             logger.warning(f"Serial port not available. Command '{command}' dropped.")
             return {'error': 'Serial port not connected'}, 503
-    else:
+    elif connection_case == 'b':
         if wifi_comms:
             try:
                 # Send the command via UDP
@@ -151,6 +171,15 @@ def send_command(command):
         else:
             logger.warning(f"WiFi comms not initialized. Command '{command}' dropped.")
             return {'error': 'WiFi not available'}, 503
+    elif connection_case == 'c':
+        if ble_comms:
+            ble_comms.send_command(command)
+            return {'status': 'success', 'command': command, 'note': 'Queued for BLE transmission'}, 200
+        else:
+            logger.warning(f"BLE comms not initialized. Command '{command}' dropped.")
+            return {'error': 'BLE not available'}, 503
+    else:
+        return {'error': f'Unknown connection case {connection_case}'}, 400
 
 def pump_off_delayed(pump_id, delay):
     time.sleep(delay)
@@ -213,12 +242,32 @@ def control():
 
 @app.route('/api/set_connection', methods=['POST'])
 def set_connection():
-    global connection_case
+    global connection_case, ble_comms
     data = request.json
     mode = data.get('mode', 'a')
-    if mode in ['a', 'b']:
+    if mode in ['a', 'b', 'c']:
         connection_case = mode
         logger.info(f"Connection mode changed to: {mode}")
+        
+        # Initialize ble_comms on demand
+        if mode == 'c' and not ble_comms:
+            ble_config = config.get('ble', {})
+            if ble_config:
+                try:
+                    ble_comms = BLEComms(
+                        device_name=ble_config.get('device_name', 'NeuroBot'),
+                        service_uuid=ble_config.get('service_uuid'),
+                        command_char_uuid=ble_config.get('command_char_uuid'),
+                        status_char_uuid=ble_config.get('status_char_uuid'),
+                        ack_callback=ble_ack_callback
+                    )
+                    logger.info("BLE Comms initialized in background thread.")
+                except Exception as e:
+                    logger.error(f"Failed to initialize BLE Comms: {e}")
+        elif mode != 'c' and ble_comms:
+            ble_comms.close()
+            ble_comms = None
+            
         return jsonify({'status': 'success', 'mode': mode})
     return jsonify({'error': 'Invalid mode'}), 400
 
