@@ -28,7 +28,7 @@ def send_command(command):
 def autonomous_loop(config):
     context = zmq.Context()
     det_sub = context.socket(zmq.SUB)
-    det_port = config.get('zmq', {}).get('detection_port', 6556)
+    det_port = config['zmq']['detection_port']
     det_sub.connect(f"tcp://127.0.0.1:{det_port}")
     det_sub.setsockopt_string(zmq.SUBSCRIBE, "")
     
