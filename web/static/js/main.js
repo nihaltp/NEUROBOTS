@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const detectionStatusText = document.getElementById('detectionStatusText');
     const detectionList = document.getElementById('detectionList');
     const totalCountDisplay = document.getElementById('totalCountDisplay');
+    const diseaseCountsList = document.getElementById('diseaseCountsList');
 
     let detectionEnabled = true;
     
@@ -46,9 +47,22 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Connected to server');
     });
 
+    function updateDiseaseCounts(counts) {
+        if (!diseaseCountsList) return;
+        diseaseCountsList.innerHTML = '';
+        for (const [disease, count] of Object.entries(counts)) {
+            const p = document.createElement('p');
+            p.innerHTML = `${disease}: <strong>${count}</strong>`;
+            diseaseCountsList.appendChild(p);
+        }
+    }
+
     socket.on('stats_update', (data) => {
         if (data.total_count !== undefined && totalCountDisplay) {
             totalCountDisplay.textContent = data.total_count;
+        }
+        if (data.disease_counts !== undefined) {
+            updateDiseaseCounts(data.disease_counts);
         }
     });
 
@@ -59,6 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (data.total_count !== undefined && totalCountDisplay) {
             totalCountDisplay.textContent = data.total_count;
+        }
+        if (data.disease_counts !== undefined) {
+            updateDiseaseCounts(data.disease_counts);
         }
 
         const detections = data.detections;

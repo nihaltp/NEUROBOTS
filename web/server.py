@@ -26,6 +26,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Disease counting state
 total_diseases_detected = 0
+disease_counts = {}
 active_detections = {}
 cooldown_period = config.get('model', {}).get('cooldown_period', 5)
 
@@ -90,6 +91,7 @@ def detection_listener():
                 last_seen = active_detections.get(class_name, 0)
                 if current_time - last_seen > cooldown_period:
                     total_diseases_detected += 1
+                    disease_counts[class_name] = disease_counts.get(class_name, 0) + 1
                     logger.info(f"New instance of {class_name} detected. Total count: {total_diseases_detected}")
                 
                 # Always update last_seen if detected in this frame
@@ -97,6 +99,7 @@ def detection_listener():
             
             # Add total_count to the payload
             data['total_count'] = total_diseases_detected
+            data['disease_counts'] = disease_counts
             socketio.emit('detections', data)
         except Exception as e:
             logger.error(f"Error in detection listener: {e}")
@@ -152,7 +155,7 @@ def video_feed():
 @socketio.on('connect')
 def handle_connect():
     logger.info("Client connected")
-    socketio.emit('stats_update', {'total_count': total_diseases_detected})
+    socketio.emit('stats_update', {'total_count': total_diseases_detected, 'disease_counts': disease_counts})
 
 @socketio.on('toggle_detection')
 def handle_toggle_detection(data):
