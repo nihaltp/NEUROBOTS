@@ -1,0 +1,88 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const socket = io();
+    const video = document.getElementById('videoStream');
+    const canvas = document.getElementById('overlayCanvas');
+    const ctx = canvas.getContext('2d');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const detectionStatusDot = document.getElementById('detectionStatusDot');
+    const detectionStatusText = document.getElementById('detectionStatusText');
+    const detectionList = document.getElementById('detectionList');
+
+    let detectionEnabled = true;
+    
+    // Setup canvas resolution to match natural video resolution (assume 640x480 for now)
+    // CSS will stretch it to match the object-fit of the video.
+    canvas.width = 640;
+    canvas.height = 480;
+
+    toggleBtn.addEventListener('click', () => {
+        detectionEnabled = !detectionEnabled;
+        
+        socket.emit('toggle_detection', { enabled: detectionEnabled });
+        
+        if (detectionEnabled) {
+            toggleBtn.textContent = 'Disable Detection';
+            toggleBtn.classList.remove('btn-primary');
+            toggleBtn.classList.add('btn-danger');
+            
+            detectionStatusDot.classList.add('active');
+            detectionStatusText.textContent = 'Detection Enabled';
+        } else {
+            toggleBtn.textContent = 'Enable Detection';
+            toggleBtn.classList.remove('btn-danger');
+            toggleBtn.classList.add('btn-primary');
+            
+            detectionStatusDot.classList.remove('active');
+            detectionStatusText.textContent = 'Detection Disabled';
+            
+            // Clear canvas immediately
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            detectionList.innerHTML = '<p class="empty-state">No threats detected.</p>';
+        }
+    });
+
+    socket.on('connect', () => {
+        console.log('Connected to server');
+    });
+
+    socket.on('detections', (data) => {
+        if (!detectionEnabled) return;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const detections = data.detections;
+        
+        if (detections.length > 0) {
+            detectionList.innerHTML = ''; // clear empty state
+            
+            detections.forEach(det => {
+                const box = det.bbox;
+                const className = det.class_name;
+                const conf = (det.confidence * 100).toFixed(1) + '%';
+                
+                // Draw Box
+                ctx.strokeStyle = '#2ecc71';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(box.x_min, box.y_min, box.x_max - box.x_min, box.y_max - box.y_min);
+                
+                // Draw Label Background
+                ctx.fillStyle = '#2ecc71';
+                ctx.fillRect(box.x_min, box.y_min - 25, 200, 25);
+                
+                // Draw Label Text
+                ctx.fillStyle = '#000';
+                ctx.font = '16px Inter, sans-serif';
+                ctx.fontWeight = 'bold';
+                ctx.fillText(`${className} ${conf}`, box.x_min + 5, box.y_min - 7);
+                
+                // Update UI list
+                const item = document.createElement('div');
+                item.className = 'detection-item';
+                item.innerHTML = `<strong>${className}</strong> - ${conf} confidence`;
+                detectionList.appendChild(item);
+            });
+        } else {
+            detectionList.innerHTML = '<p class="empty-state">No threats detected.</p>';
+        }
+    });
+});

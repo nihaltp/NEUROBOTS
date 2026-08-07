@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroBots Agricultural Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Google Fonts for typography (Local) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+    <!-- Socket.IO (Local) -->
+    <script src="{{ url_for('static', filename='js/socket.io.js') }}"></script>
+    <!-- Nipple.js (Local) -->
+    <script src="{{ url_for('static', filename='js/nipplejs.min.js') }}"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <h1>NeuroBots</h1>
+            <p>Agricultural Robot Control</p>
+        </header>
+        
+        <main>
+            <div class="video-container">
+                <div class="video-wrapper">
+                    <!-- The MJPEG Stream -->
+                    <img id="videoStream" src="/video_feed" alt="Camera Feed">
+                    <!-- Overlay Canvas for Bounding Boxes -->
+                    <canvas id="overlayCanvas"></canvas>
+                </div>
+            </div>
+            
+            <div class="stats-container">
+                <div class="controls-panel card glass">
+                    <h2>Detection Controls</h2>
+                    <div class="status-indicator">
+                        <span id="detectionStatusDot" class="dot active"></span>
+                        <span id="detectionStatusText">Detection Enabled</span>
+                    </div>
+                    <button id="toggleBtn" class="btn btn-danger">Disable Detection</button>
+                </div>
+                
+                <div class="card glass">
+                    <h3>Robot Status</h3>
+                    <p>Connection: <strong class="text-success">Online</strong></p>
+                    <p>Battery: <strong>85%</strong></p>
+                    <p>Mode: <strong>Manual</strong></p>
+                </div>
+                
+                <div class="card glass">
+                    <h3>Latest Detections</h3>
+                    <div id="detectionList" class="detection-list">
+                        <p class="empty-state">No threats detected.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

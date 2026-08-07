@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Control Interface</title>
+    <script src="{{ url_for('static', filename='js/nipplejs.min.js') }}"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            margin-bottom: 30px;
+        }
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .btn {
+            background-color: #333;
+            color: #fff;
+            border: none;
+            padding: 20px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            user-select: none;
+        }
+        .btn:hover {
+            background-color: #444;
+        }
+        .btn:active {
+            background-color: #555;
+            transform: scale(0.95);
+        }
+        .btn.primary {
+            background-color: #007bff;
+        }
+        .btn.primary:hover {
+            background-color: #0069d9;
+        }
+        .btn.danger {
+            background-color: #dc3545;
+        }
+        .btn.danger:hover {
+            background-color: #c82333;
+        }
+        .empty {
+            visibility: hidden;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px 20px;
+            border-radius: 4px;
+            background-color: #222;
+            min-width: 200px;
+            text-align: center;
+        }
+        .pump-controls {
+            display: flex;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Robot Control</h1>
+
+    <div class="mode-selector" style="margin-bottom: 20px;">
+        <button id="modeToggleBtn" class="btn primary" onclick="toggleControlMode()" style="padding: 10px 20px; font-size: 16px;">Switch to Buttons</button>
+    </div>
+    
+    <div id="joystick-container">
+        <div id="joystick-zone" style="width: 200px; height: 200px; position: relative; margin-bottom: 30px; background: #222; border-radius: 50%; box-shadow: 0 0 15px rgba(0,0,0,0.5);"></div>
+    </div>
+
+    <div id="buttons-container" style="display: none;">
+        <div class="control-panel">
+            <div class="empty"></div>
+            <button class="btn" onmousedown="sendCommand('F')" onmouseup="sendCommand('S')" ontouchstart="sendCommand('F')" ontouchend="sendCommand('S')">W / Fwd</button>
+            <div class="empty"></div>
+            
+            <button class="btn" onmousedown="sendCommand('L')" onmouseup="sendCommand('S')" ontouchstart="sendCommand('L')" ontouchend="sendCommand('S')">A / Left</button>
+            <button class="btn danger" onmousedown="sendCommand('S')" ontouchstart="sendCommand('S')">Stop</button>
+            <button class="btn" onmousedown="sendCommand('R')" onmouseup="sendCommand('S')" ontouchstart="sendCommand('R')" ontouchend="sendCommand('S')">D / Right</button>
+            
+            <div class="empty"></div>
+            <button class="btn" onmousedown="sendCommand('B')" onmouseup="sendCommand('S')" ontouchstart="sendCommand('B')" ontouchend="sendCommand('S')">S / Back</button>
+            <div class="empty"></div>
+        </div>
+    </div>
+    
+    <h3>Pump Controls</h3>
+    <div class="pump-controls">
+        <button class="btn primary" id="pumpToggleBtn" onclick="togglePump()">Pump ON</button>
+    </div>
+
+    <div class="status" id="statusBox">Status: Ready</div>
+
+    <script>
+        let currentMode = 'joystick';
+        function toggleControlMode() {
+            const btn = document.getElementById('modeToggleBtn');
+            if (currentMode === 'joystick') {
+                currentMode = 'buttons';
+                document.getElementById('joystick-container').style.display = 'none';
+                document.getElementById('buttons-container').style.display = 'block';
+                btn.textContent = 'Switch to Joystick';
+            } else {
+                currentMode = 'joystick';
+                document.getElementById('joystick-container').style.display = 'block';
+                document.getElementById('buttons-container').style.display = 'none';
+                btn.textContent = 'Switch to Buttons';
+            }
+        }
+
+        let pumpState = false;
+        function togglePump() {
+            pumpState = !pumpState;
+            const btn = document.getElementById('pumpToggleBtn');
+            if (pumpState) {
+                sendCommand('P1');
+                btn.textContent = 'Pump OFF';
+                btn.classList.remove('primary');
+                btn.classList.add('danger');
+            } else {
+                sendCommand('P0');
+                btn.textContent = 'Pump ON';
+                btn.classList.remove('danger');
+                btn.classList.add('primary');
+            }
+        }
+
+        function sendCommand(cmd) {
+            const statusBox = document.getElementById('statusBox');
+            statusBox.textContent = `Sending: ${cmd}...`;
+            
+            fetch('/api/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ command: cmd })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    statusBox.textContent = `Command sent: ${cmd}`;
+                } else {
+                    statusBox.textContent = `Error: ${data.error}`;
+                }
+            })
+            .catch(error => {
+                statusBox.textContent = `Network Error!`;
+                console.error('Error:', error);
+            });
+        }
+        
+        // Joystick support
+        var joystickZone = document.getElementById('joystick-zone');
+        var manager = nipplejs.create({
+            zone: joystickZone,
+            mode: 'static',
+            position: { left: '50%', top: '50%' },
+            color: '#007bff'
+        });
+
+        manager.on('dir:up', function () { sendCommand('F'); });
+        manager.on('dir:down', function () { sendCommand('B'); });
+        manager.on('dir:left', function () { sendCommand('L'); });
+        manager.on('dir:right', function () { sendCommand('R'); });
+        manager.on('end', function () { sendCommand('S'); });
+
+        // Keyboard support
+        document.addEventListener('keydown', function(event) {
+            if (event.repeat) return; // Ignore auto-repeat
+            
+            switch(event.key.toLowerCase()) {
+                case 'w': sendCommand('F'); break;
+                case 'a': sendCommand('L'); break;
+                case 's': sendCommand('B'); break;
+                case 'd': sendCommand('R'); break;
+                case ' ': sendCommand('S'); break; // Space for stop
+            }
+        });
+
+        document.addEventListener('keyup', function(event) {
+            switch(event.key.toLowerCase()) {
+                case 'w':
+                case 'a':
+                case 's':
+                case 'd':
+                    sendCommand('S'); break;
+            }
+        });
+    </script>
+</body>
+</html>
