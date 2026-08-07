@@ -3,8 +3,8 @@
  * Direct control from Laptop to ESP32 via Wi-Fi WebSockets
  *
  * Required Libraries:
- * - ESPAsyncWebServer (https://github.com/me-no-dev/ESPAsyncWebServer)
- * - AsyncTCP (https://github.com/me-no-dev/AsyncTCP)
+ * - ESPAsyncWebServer (https://github.com/mathieucarbou/ESPAsyncWebServer)
+ * - AsyncTCP (https://github.com/mathieucarbou/AsyncTCP)
  */
 
 #include <WiFi.h>
