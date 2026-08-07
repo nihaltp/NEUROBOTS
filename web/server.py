@@ -220,7 +220,8 @@ def detection_listener():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    master_mode = os.environ.get("MASTER_MODE") == "1"
+    return render_template('index.html', master_mode=master_mode)
 
 @app.route('/control')
 def control():

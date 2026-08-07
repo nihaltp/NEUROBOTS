@@ -97,7 +97,9 @@ def main():
         return
 
     logger.info("Starting Web Server...")
-    server_process = subprocess.Popen([sys.executable, "web/server.py"])
+    env = os.environ.copy()
+    env["MASTER_MODE"] = "1"
+    server_process = subprocess.Popen([sys.executable, "web/server.py"], env=env)
     
     logger.info("Starting Disease Detection...")
     detection_process = subprocess.Popen([sys.executable, "disease_detection/detect_disease.py"])
