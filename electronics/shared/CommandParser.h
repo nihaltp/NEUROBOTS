@@ -5,7 +5,22 @@
 #include "Motors.h"
 #include "Pump.h"
 
+unsigned long lastCommandTime = 0;
+const unsigned long COMMAND_TIMEOUT_MS = 2000; // Stop hardware if no command for 2 seconds
+
+void checkCommandTimeout() {
+  // If we have received a command before, and time elapsed exceeds timeout
+  if (lastCommandTime > 0 && millis() - lastCommandTime > COMMAND_TIMEOUT_MS) {
+    stopMotors();
+    pumpOff(1);
+    pumpOff(2);
+    lastCommandTime = 0; // Reset so it doesn't repeatedly call stop
+    Serial.println("ERR: Command Timeout! Halted all hardware for safety.");
+  }
+}
+
 void processCommand(String command) {
+  lastCommandTime = millis();
   int speed_percent = 60; // default ~150 PWM
   int colonIndex = command.indexOf(':');
   

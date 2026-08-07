@@ -26,6 +26,8 @@ void setup() {
 }
 
 void loop() {
+  checkCommandTimeout();
+
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
     command.trim();  // Remove whitespace/newlines

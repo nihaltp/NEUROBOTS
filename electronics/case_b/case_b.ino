@@ -74,5 +74,6 @@ void setup() {
 }
 
 void loop() {
+    checkCommandTimeout();
     ws.cleanupClients();
 }

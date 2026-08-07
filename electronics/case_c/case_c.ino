@@ -109,6 +109,7 @@ void setup() {
 }
 
 void loop() {
+    checkCommandTimeout();
     // BLE is handled asynchronously via NimBLE callbacks.
     // Periodic status updates could be sent here (e.g., battery).
     delay(10);
