@@ -111,6 +111,11 @@
 
     <div class="status" id="statusBox">Status: Ready</div>
 
+    <h3>Command Log</h3>
+    <div id="serial-monitor" style="width: 80%; max-width: 600px; height: 150px; background-color: #000; color: #0f0; font-family: monospace; padding: 10px; overflow-y: scroll; border: 1px solid #444; border-radius: 4px; margin-bottom: 20px; text-align: left; box-sizing: border-box;">
+        <!-- Logs will appear here -->
+    </div>
+
     <script>
         let currentMode = 'joystick';
         function toggleControlMode() {
@@ -174,9 +179,20 @@
             });
         }
 
+        function appendToLog(text) {
+            const monitor = document.getElementById('serial-monitor');
+            const time = new Date().toLocaleTimeString();
+            const logLine = document.createElement('div');
+            logLine.textContent = `[${time}] ${text}`;
+            monitor.appendChild(logLine);
+            monitor.scrollTop = monitor.scrollHeight; // Auto-scroll to bottom
+        }
+
         function sendCommand(cmd) {
             const statusBox = document.getElementById('statusBox');
             statusBox.textContent = `Sending: ${cmd}...`;
+            appendToLog(`-> Sent: ${cmd}`);
+            
             fetch('/api/command', {
                 method: 'POST',
                 headers: {
@@ -187,13 +203,20 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    statusBox.textContent = `Command sent (HTTP): ${cmd}`;
+                    statusBox.textContent = `Command sent: ${cmd}`;
+                    if (data.response) {
+                        appendToLog(`<- Received: ${data.response}`);
+                    } else if (data.note) {
+                        appendToLog(`<- Note: ${data.note}`);
+                    }
                 } else {
                     statusBox.textContent = `Error: ${data.error}`;
+                    appendToLog(`<- Error: ${data.error}`);
                 }
             })
             .catch(error => {
                 statusBox.textContent = `Network Error!`;
+                appendToLog(`<- Network Error: ${error.message || error}`);
                 console.error('Error:', error);
             });
         }
