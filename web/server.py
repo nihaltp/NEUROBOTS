@@ -83,17 +83,20 @@ context = zmq.Context()
 
 # Frame Subscriber
 frame_sub = context.socket(zmq.SUB)
+frame_sub.setsockopt(zmq.LINGER, 0)
 frame_sub.setsockopt(zmq.CONFLATE, 1) # Only keep latest frame
 frame_sub.connect(f"tcp://127.0.0.1:{config['zmq']['frame_port']}")
 frame_sub.setsockopt_string(zmq.SUBSCRIBE, "")
 
 # Detection Subscriber
 det_sub = context.socket(zmq.SUB)
+det_sub.setsockopt(zmq.LINGER, 0)
 det_sub.connect(f"tcp://127.0.0.1:{config['zmq']['detection_port']}")
 det_sub.setsockopt_string(zmq.SUBSCRIBE, "")
 
 # Control Publisher
 control_pub = context.socket(zmq.PUB)
+control_pub.setsockopt(zmq.LINGER, 0)
 control_pub.connect(f"tcp://127.0.0.1:{config['zmq']['control_port']}")
 
 def generate_frames():
@@ -187,36 +190,64 @@ def detection_listener():
     global total_diseases_detected
     
     logger.info("Starting detection listener thread...")
+    poller = zmq.Poller()
+    poller.register(det_sub, zmq.POLLIN)
+    
+    detector_online = False
+    
     while True:
         try:
-            msg = det_sub.recv_string()
-            data = json.loads(msg)
+            socks = dict(poller.poll(2000)) # 2-second timeout
             
-            # Process detections for counting with debounce
-            current_time = time.time()
-            classes_in_frame = set()
-            
-            for det in data.get('detections', []):
-                classes_in_frame.add(det['class_name'])
-                
-            for class_name in classes_in_frame:
-                last_seen = active_detections.get(class_name, 0)
-                if current_time - last_seen > cooldown_period:
-                    total_diseases_detected += 1
-                    disease_counts[class_name] = disease_counts.get(class_name, 0) + 1
-                    logger.info(f"New instance of {class_name} detected. Total count: {total_diseases_detected}")
+            if det_sub in socks and socks[det_sub] == zmq.POLLIN:
+                if not detector_online:
+                    detector_online = True
+                    socketio.emit('detector_status', {'status': 'online'})
                     
+                msg = det_sub.recv_string()
+                data = json.loads(msg)
                 
-                # Always update last_seen if detected in this frame
-                active_detections[class_name] = current_time
-            
-            # Add total_count to the payload
-            data['total_count'] = total_diseases_detected
-            data['disease_counts'] = disease_counts
-            socketio.emit('detections', data)
+                if data.get('heartbeat'):
+                    continue # Just a heartbeat, ignore for detection processing
+                
+                # Process detections for counting with debounce
+                current_time = time.time()
+                classes_in_frame = set()
+                
+                for det in data.get('detections', []):
+                    classes_in_frame.add(det['class_name'])
+                    
+                for class_name in classes_in_frame:
+                    last_seen = active_detections.get(class_name, 0)
+                    if current_time - last_seen > cooldown_period:
+                        total_diseases_detected += 1
+                        disease_counts[class_name] = disease_counts.get(class_name, 0) + 1
+                        logger.info(f"New instance of {class_name} detected. Total count: {total_diseases_detected}")
+                        
+                    # Always update last_seen if detected in this frame
+                    active_detections[class_name] = current_time
+                
+                # Add total_count to the payload
+                data['total_count'] = total_diseases_detected
+                data['disease_counts'] = disease_counts
+                socketio.emit('detections', data)
+            else:
+                if detector_online:
+                    detector_online = False
+                    socketio.emit('detector_status', {'status': 'offline'})
+                    
         except Exception as e:
             logger.error(f"Error in detection listener: {e}")
             time.sleep(0.1)
+
+def heartbeat_sender():
+    """Background task to periodically send heartbeats to the detector."""
+    while True:
+        try:
+            control_pub.send_string(json.dumps({'heartbeat': True, 'timestamp': time.time()}))
+        except Exception as e:
+            logger.error(f"Error sending heartbeat: {e}")
+        time.sleep(1)
 
 @app.route('/')
 def index():
@@ -289,6 +320,7 @@ def handle_toggle_detection(data):
 if __name__ == '__main__':
     # Start the background task for detections
     socketio.start_background_task(target=detection_listener)
+    socketio.start_background_task(target=heartbeat_sender)
     
     host = config['server'].get('host', '0.0.0.0')
     port = config['server'].get('port', 5000)

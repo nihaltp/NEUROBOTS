@@ -75,16 +75,19 @@ def main():
     
     # Frame Publisher
     frame_pub = context.socket(zmq.PUB)
+    frame_pub.setsockopt(zmq.LINGER, 0)
     frame_pub.bind(f"tcp://*:{config['zmq']['frame_port']}")
     logger.info(f"Frame Publisher bound to port {config['zmq']['frame_port']}")
     
     # Detection Publisher
     det_pub = context.socket(zmq.PUB)
+    det_pub.setsockopt(zmq.LINGER, 0)
     det_pub.bind(f"tcp://*:{config['zmq']['detection_port']}")
     logger.info(f"Detection Publisher bound to port {config['zmq']['detection_port']}")
     
     # Control Subscriber
     control_sub = context.socket(zmq.SUB)
+    control_sub.setsockopt(zmq.LINGER, 0)
     control_sub.bind(f"tcp://*:{config['zmq']['control_port']}")
     control_sub.setsockopt_string(zmq.SUBSCRIBE, "")
     logger.info(f"Control Subscriber bound to port {config['zmq']['control_port']}")
@@ -137,20 +140,35 @@ def main():
     display_until_time = 0.0
     display_duration = config['model'].get('display_duration', 3.0)
     
+    last_heartbeat_time = 0
+    client_connected = False
+    last_det_heartbeat = 0
+    
     try:
         while True:
             # Check for control messages
             try:
-                msg = control_sub.recv_string(flags=zmq.NOBLOCK)
-                try:
-                    command = json.loads(msg)
-                    if 'detection_enabled' in command:
-                        detection_enabled = command['detection_enabled']
-                        logger.info(f"Detection enabled set to: {detection_enabled}")
-                except json.JSONDecodeError:
-                    pass
+                while True: # Drain all messages
+                    msg = control_sub.recv_string(flags=zmq.NOBLOCK)
+                    try:
+                        command = json.loads(msg)
+                        if 'heartbeat' in command:
+                            last_heartbeat_time = time.time()
+                            if not client_connected:
+                                logger.info("Web client connected.")
+                                client_connected = True
+                        if 'detection_enabled' in command:
+                            detection_enabled = command['detection_enabled']
+                            logger.info(f"Detection enabled set to: {detection_enabled}")
+                    except json.JSONDecodeError:
+                        pass
             except zmq.Again:
                 pass # No messages available
+
+            current_time = time.time()
+            if client_connected and current_time - last_heartbeat_time > 5.0:
+                logger.warning("Web client disconnected. Suspending detection to save resources.")
+                client_connected = False
 
             ret, frame = cap.read()
             if not ret:
@@ -161,7 +179,8 @@ def main():
             display_frame = frame.copy() if args.show else None
             frame_detections = []
             
-            if detection_enabled:
+            # Only run inference if client is connected or we are showing locally
+            if detection_enabled and (client_connected or args.show):
                 # Preprocess and run classification
                 input_tensor = preprocess_frame(frame)
                 outputs = session.run(None, {input_name: input_tensor})
@@ -206,16 +225,22 @@ def main():
 
                 # Publish detections
                 output_payload = {
-                    "timestamp": time.time(),
+                    "timestamp": current_time,
                     "detections": frame_detections
                 }
                 if args.debug and frame_detections:
                     logger.debug(f"Classified as: {frame_detections[0]['class_name']} ({frame_detections[0]['confidence']:.4f})")
                 det_pub.send_string(json.dumps(output_payload))
+            else:
+                # Send heartbeat on det_pub to let server know we're still alive
+                if current_time - last_det_heartbeat > 1.0:
+                    det_pub.send_string(json.dumps({"heartbeat": True, "timestamp": current_time}))
+                    last_det_heartbeat = current_time
                 
-            # Publish frame as JPEG
-            _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-            frame_pub.send(buffer.tobytes())
+            # Publish frame as JPEG only if client is connected to save CPU
+            if client_connected:
+                _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                frame_pub.send(buffer.tobytes())
             
             if args.show:
                 cv2.imshow('Plant Disease Classification', display_frame)
