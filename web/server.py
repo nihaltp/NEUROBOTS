@@ -7,6 +7,7 @@ import logging
 from flask import Flask, render_template, Response, request, jsonify
 from flask_socketio import SocketIO
 import serial
+import threading
 
 # Add parent directory to path to import config_loader
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,6 +33,7 @@ cooldown_period = config.get('model', {}).get('cooldown_period', 5)
 serial_port = config.get('serial', {}).get('port', 'COM3')
 serial_baud = config.get('serial', {}).get('baudrate', 115200)
 ser = None
+serial_lock = threading.Lock()
 try:
     ser = serial.Serial(serial_port, serial_baud, timeout=1)
     logger.info(f"Connected to serial port {serial_port} at {serial_baud}")
@@ -118,12 +120,26 @@ def handle_command():
     logger.info(f"Received command: {command}")
     
     if ser and ser.is_open:
-        try:
-            ser.write((command + '\n').encode('utf-8'))
-            return jsonify({'status': 'success', 'command': command})
-        except Exception as e:
-            logger.error(f"Failed to write to serial: {e}")
-            return jsonify({'error': str(e)}), 500
+        with serial_lock:
+            try:
+                ser.reset_input_buffer()
+                ser.write((command + '\n').encode('utf-8'))
+                
+                # Wait for ACK or ERR (relies on serial timeout=1)
+                response = ser.readline().decode('utf-8', errors='ignore').strip()
+                if response.startswith('ACK'):
+                    logger.info(f"ESP32 Acknowledged: {response}")
+                    return jsonify({'status': 'success', 'command': command, 'response': response})
+                elif response.startswith('ERR'):
+                    logger.error(f"ESP32 Error: {response}")
+                    return jsonify({'error': response}), 400
+                else:
+                    logger.warning(f"Timeout or unknown response for command '{command}': '{response}'")
+                    return jsonify({'error': 'Timeout or unknown response from robot'}), 504
+                    
+            except Exception as e:
+                logger.error(f"Failed to write to serial: {e}")
+                return jsonify({'error': str(e)}), 500
     else:
         logger.warning(f"Serial port not available. Command '{command}' dropped.")
         return jsonify({'error': 'Serial port not connected'}), 503
