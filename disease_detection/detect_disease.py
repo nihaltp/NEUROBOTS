@@ -68,14 +68,15 @@ def main():
         logger.error(f"Failed to load model from {model_path}: {e}")
         return
 
-    cap = cv2.VideoCapture(0)
+    camera_index = config['camera'].get('index', 0)
+    cap = cv2.VideoCapture(camera_index)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, config['camera']['width'])
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config['camera']['height'])
     if 'fps' in config['camera']:
         cap.set(cv2.CAP_PROP_FPS, config['camera']['fps'])
 
     if not cap.isOpened():
-        logger.error("Failed to open the webcam (index 0).")
+        logger.error(f"Failed to open the webcam (index {camera_index}).")
         return
         
     logger.info("Webcam opened successfully.")
