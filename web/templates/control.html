@@ -151,6 +151,12 @@
         }
 
         let connectionType = 'a';
+        
+        // Fetch current mode from server on load
+        window.onload = function() {
+            // Force a sync to whatever the dropdown is currently set to
+            toggleConnectionMode();
+        };
 
         function toggleConnectionMode() {
             connectionType = document.getElementById('connectionMode').value;
