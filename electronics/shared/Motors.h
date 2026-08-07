@@ -54,4 +54,18 @@ void turnRight(int speed) {
   analogWrite(MOTOR_R_LPWM, speed);
 }
 
+void turnHalfLeft(int speed) {
+  analogWrite(MOTOR_L_RPWM, 0);
+  analogWrite(MOTOR_L_LPWM, 0);
+  analogWrite(MOTOR_R_RPWM, speed);
+  analogWrite(MOTOR_R_LPWM, 0);
+}
+
+void turnHalfRight(int speed) {
+  analogWrite(MOTOR_L_RPWM, speed);
+  analogWrite(MOTOR_L_LPWM, 0);
+  analogWrite(MOTOR_R_RPWM, 0);
+  analogWrite(MOTOR_R_LPWM, 0);
+}
+
 #endif // MOTORS_H
