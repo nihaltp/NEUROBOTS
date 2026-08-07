@@ -1,0 +1,7 @@
+opencv-python
+ultralytics
+flask
+flask-socketio
+pyzmq
+pyyaml
+pyserial
