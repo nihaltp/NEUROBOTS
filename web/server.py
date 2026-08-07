@@ -38,26 +38,25 @@ wifi_comms = None
 ser = None
 serial_lock = threading.Lock()
 
-if connection_case == 'a':
-    # Serial Port setup
-    serial_port = config.get('serial', {}).get('port', 'COM3')
-    serial_baud = config.get('serial', {}).get('baudrate', 115200)
-    try:
-        ser = serial.Serial(serial_port, serial_baud, timeout=1)
-        logger.info(f"Connected to serial port {serial_port} at {serial_baud}")
-    except Exception as e:
-        logger.error(f"Failed to connect to serial port {serial_port}: {e}")
-else:
-    # WiFi setup for ESP32
-    esp_ip = config.get('wifi', {}).get('esp_ip', '192.168.4.1')
-    esp_port = config.get('wifi', {}).get('esp_port', 12345)
-    local_port = config.get('wifi', {}).get('local_port', 12346)
-    
-    try:
-        wifi_comms = WiFiComms(local_port=local_port)
-        logger.info(f"WiFi Comms initialized. Target ESP32: {esp_ip}:{esp_port}")
-    except Exception as e:
-        logger.error(f"Failed to initialize WiFi Comms: {e}")
+# Always initialize Serial
+serial_port = config.get('serial', {}).get('port', 'COM3')
+serial_baud = config.get('serial', {}).get('baudrate', 115200)
+try:
+    ser = serial.Serial(serial_port, serial_baud, timeout=1)
+    logger.info(f"Connected to serial port {serial_port} at {serial_baud}")
+except Exception as e:
+    logger.error(f"Failed to connect to serial port {serial_port}: {e}")
+
+# Always initialize WiFi
+esp_ip = config.get('wifi', {}).get('esp_ip', '192.168.4.1')
+esp_port = config.get('wifi', {}).get('esp_port', 12345)
+local_port = config.get('wifi', {}).get('local_port', 12346)
+
+try:
+    wifi_comms = WiFiComms(local_port=local_port)
+    logger.info(f"WiFi Comms initialized. Target ESP32: {esp_ip}:{esp_port}")
+except Exception as e:
+    logger.error(f"Failed to initialize WiFi Comms: {e}")
 
 # ZMQ Context
 context = zmq.Context()
