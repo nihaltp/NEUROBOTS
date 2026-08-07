@@ -23,6 +23,11 @@ logger = logging.getLogger("WebServer")
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# Disease counting state
+total_diseases_detected = 0
+active_detections = {}
+cooldown_period = config.get('model', {}).get('cooldown_period', 5)
+
 # Serial Port setup
 serial_port = config.get('serial', {}).get('port', 'COM3')
 serial_baud = config.get('serial', {}).get('baudrate', 115200)
@@ -64,11 +69,32 @@ def generate_frames():
 
 def detection_listener():
     """Background task to listen for detections and push to clients."""
+    global total_diseases_detected
+    
     logger.info("Starting detection listener thread...")
     while True:
         try:
             msg = det_sub.recv_string()
             data = json.loads(msg)
+            
+            # Process detections for counting with debounce
+            current_time = time.time()
+            classes_in_frame = set()
+            
+            for det in data.get('detections', []):
+                classes_in_frame.add(det['class_name'])
+                
+            for class_name in classes_in_frame:
+                last_seen = active_detections.get(class_name, 0)
+                if current_time - last_seen > cooldown_period:
+                    total_diseases_detected += 1
+                    logger.info(f"New instance of {class_name} detected. Total count: {total_diseases_detected}")
+                
+                # Always update last_seen if detected in this frame
+                active_detections[class_name] = current_time
+            
+            # Add total_count to the payload
+            data['total_count'] = total_diseases_detected
             socketio.emit('detections', data)
         except Exception as e:
             logger.error(f"Error in detection listener: {e}")
@@ -110,6 +136,7 @@ def video_feed():
 @socketio.on('connect')
 def handle_connect():
     logger.info("Client connected")
+    socketio.emit('stats_update', {'total_count': total_diseases_detected})
 
 @socketio.on('toggle_detection')
 def handle_toggle_detection(data):

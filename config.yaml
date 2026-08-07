@@ -6,6 +6,7 @@ camera:
 model:
   path: "weights/best.onnx"
   confidence_threshold: 0.25
+  cooldown_period: 5
 
 zmq:
   frame_port: 5555

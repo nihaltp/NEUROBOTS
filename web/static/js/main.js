@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const detectionStatusDot = document.getElementById('detectionStatusDot');
     const detectionStatusText = document.getElementById('detectionStatusText');
     const detectionList = document.getElementById('detectionList');
+    const totalCountDisplay = document.getElementById('totalCountDisplay');
 
     let detectionEnabled = true;
     
@@ -45,11 +46,21 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Connected to server');
     });
 
+    socket.on('stats_update', (data) => {
+        if (data.total_count !== undefined && totalCountDisplay) {
+            totalCountDisplay.textContent = data.total_count;
+        }
+    });
+
     socket.on('detections', (data) => {
         if (!detectionEnabled) return;
         
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
+        if (data.total_count !== undefined && totalCountDisplay) {
+            totalCountDisplay.textContent = data.total_count;
+        }
+
         const detections = data.detections;
         
         if (detections.length > 0) {
