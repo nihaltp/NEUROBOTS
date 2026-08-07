@@ -96,13 +96,17 @@ def main():
         logger.error(f"Failed to load config: {e}")
         return
 
+    kwargs = {}
+    if os.name == 'nt':
+        kwargs['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
+
     logger.info("Starting Web Server...")
     env = os.environ.copy()
     env["MASTER_MODE"] = "1"
-    server_process = subprocess.Popen([sys.executable, "web/server.py"], env=env)
+    server_process = subprocess.Popen([sys.executable, "web/server.py"], env=env, **kwargs)
     
     logger.info("Starting Disease Detection...")
-    detection_process = subprocess.Popen([sys.executable, "disease_detection/detect_disease.py"])
+    detection_process = subprocess.Popen([sys.executable, "disease_detection/detect_disease.py"], **kwargs)
     
     # Give the server time to start up before starting the autonomous loop
     time.sleep(5)
@@ -125,8 +129,18 @@ def main():
         logger.info("Keyboard interrupt received. Shutting down...")
     finally:
         logger.info("Sending HALT ALL command to rover before shutdown...")
-        send_command("STOPALL")
-        time.sleep(0.5) # Give it a moment to send before killing server
+        while True:
+            try:
+                logger.info("Requesting STOPALL...")
+                response = requests.post('http://127.0.0.1:5000/api/command', json={'command': "STOPALL"}, timeout=2)
+                if response.status_code == 200 and response.json().get('status') == 'success':
+                    logger.info("ACK of stopping everything received.")
+                    break
+                else:
+                    logger.warning("Failed to get ACK, retrying...")
+            except Exception as e:
+                logger.error(f"Error sending STOPALL: {e}")
+            time.sleep(1)
         logger.info("Terminating subprocesses...")
         server_process.terminate()
         detection_process.terminate()
