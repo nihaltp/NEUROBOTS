@@ -13,6 +13,8 @@ model:
   cooldown_period: 5
   display_duration: 1.0
 
+connection_case: "c"
+
 zmq:
   frame_port: 5555
   detection_port: 5556
@@ -36,6 +38,7 @@ wifi:
   local_port: 12346
 
 pump_control:
+  default_duration: 1.0
   mapping:
     "Tomato with Late Blight": 1
     "Tomato with Early Blight": 2

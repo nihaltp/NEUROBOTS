@@ -93,19 +93,19 @@
     <div id="buttons-container" style="display: none;">
         <div class="control-panel">
             <div class="empty"></div>
-            <button class="btn" onmousedown="sendCommand('F')" onmouseup="sendCommand('S')" ontouchstart="sendCommand('F')" ontouchend="sendCommand('S')">W / Fwd</button>
+            <button class="btn" onmousedown="startMove('F')" onmouseup="stopMove()" ontouchstart="startMove('F')" ontouchend="stopMove()">W / Fwd</button>
             <div class="empty"></div>
             
-            <button class="btn" onmousedown="sendCommand('L')" onmouseup="sendCommand('S')" ontouchstart="sendCommand('L')" ontouchend="sendCommand('S')">A / Left</button>
-            <button class="btn danger" onmousedown="sendCommand('S')" ontouchstart="sendCommand('S')">Stop</button>
-            <button class="btn" onmousedown="sendCommand('R')" onmouseup="sendCommand('S')" ontouchstart="sendCommand('R')" ontouchend="sendCommand('S')">D / Right</button>
+            <button class="btn" onmousedown="startMove('L')" onmouseup="stopMove()" ontouchstart="startMove('L')" ontouchend="stopMove()">A / Left</button>
+            <button class="btn danger" onmousedown="stopMove()" ontouchstart="stopMove()">Stop</button>
+            <button class="btn" onmousedown="startMove('R')" onmouseup="stopMove()" ontouchstart="startMove('R')" ontouchend="stopMove()">D / Right</button>
             
             <div class="empty"></div>
-            <button class="btn" onmousedown="sendCommand('B')" onmouseup="sendCommand('S')" ontouchstart="sendCommand('B')" ontouchend="sendCommand('S')">S / Back</button>
+            <button class="btn" onmousedown="startMove('B')" onmouseup="stopMove()" ontouchstart="startMove('B')" ontouchend="stopMove()">S / Back</button>
             <div class="empty"></div>
         </div>
     </div>
-    
+
     <h3>Pump Controls</h3>
     <div class="pump-controls">
         <button class="btn primary" id="pump1ToggleBtn" onclick="togglePump(1)">Pump 1 ON</button>
@@ -250,6 +250,30 @@
             });
         }
         
+        let moveInterval = null;
+        let currentMoveCmd = null;
+
+        function startMove(cmd) {
+            if (currentMoveCmd === cmd) return;
+            currentMoveCmd = cmd;
+            
+            let speed = 20; // Starting speed
+            sendCommand(`${cmd}:${speed}`);
+            
+            clearInterval(moveInterval);
+            moveInterval = setInterval(() => {
+                speed += 10;
+                if (speed > 100) speed = 100;
+                sendCommand(`${cmd}:${speed}`);
+            }, 200);
+        }
+
+        function stopMove() {
+            clearInterval(moveInterval);
+            currentMoveCmd = null;
+            sendCommand('S');
+        }
+
         // Joystick support
         var joystickZone = document.getElementById('joystick-zone');
         var manager = nipplejs.create({
@@ -259,22 +283,40 @@
             color: '#007bff'
         });
 
-        manager.on('dir:up', function () { sendCommand('F'); });
-        manager.on('dir:down', function () { sendCommand('B'); });
-        manager.on('dir:left', function () { sendCommand('L'); });
-        manager.on('dir:right', function () { sendCommand('R'); });
-        manager.on('end', function () { sendCommand('S'); });
+        let lastJoyTime = 0;
+        let currentJoyCmd = null;
+        manager.on('move', function (evt, data) {
+            if (data.direction) {
+                let dir = data.direction.angle;
+                let cmdMap = { 'up': 'F', 'down': 'B', 'left': 'L', 'right': 'R' };
+                let cmd = cmdMap[dir];
+                if (cmd) {
+                    let speed = Math.min(100, Math.round((data.distance / 50) * 100));
+                    
+                    let now = Date.now();
+                    if (now - lastJoyTime > 200 || currentJoyCmd !== cmd) {
+                        sendCommand(`${cmd}:${speed}`);
+                        lastJoyTime = now;
+                        currentJoyCmd = cmd;
+                    }
+                }
+            }
+        });
+        manager.on('end', function () { 
+            currentJoyCmd = null;
+            sendCommand('S'); 
+        });
 
         // Keyboard support
         document.addEventListener('keydown', function(event) {
             if (event.repeat) return; // Ignore auto-repeat
             
             switch(event.key.toLowerCase()) {
-                case 'w': sendCommand('F'); break;
-                case 'a': sendCommand('L'); break;
-                case 's': sendCommand('B'); break;
-                case 'd': sendCommand('R'); break;
-                case ' ': sendCommand('S'); break; // Space for stop
+                case 'w': startMove('F'); break;
+                case 'a': startMove('L'); break;
+                case 's': startMove('B'); break;
+                case 'd': startMove('R'); break;
+                case ' ': stopMove(); break; // Space for stop
             }
         });
 
@@ -284,7 +326,7 @@
                 case 'a':
                 case 's':
                 case 'd':
-                    sendCommand('S'); break;
+                    stopMove(); break;
             }
         });
     </script>
