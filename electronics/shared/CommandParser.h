@@ -6,18 +6,28 @@
 #include "Pump.h"
 
 void processCommand(String command) {
+  int speed_percent = 60; // default ~150 PWM
+  int colonIndex = command.indexOf(':');
+  
+  if (colonIndex != -1 && (command.startsWith("F") || command.startsWith("B") || command.startsWith("L") || command.startsWith("R"))) {
+    speed_percent = command.substring(colonIndex + 1).toInt();
+    speed_percent = constrain(speed_percent, 0, 100);
+  }
+  
+  int pwm_speed = map(speed_percent, 0, 100, 0, 255);
+
   if (command.startsWith("F")) {
     Serial.println("ACK: Moving Forward");
-    moveForward(150);
+    moveForward(pwm_speed);
   } else if (command.startsWith("B")) {
     Serial.println("ACK: Moving Backward");
-    moveBackward(150);
+    moveBackward(pwm_speed);
   } else if (command.startsWith("L")) {
     Serial.println("ACK: Turning Left");
-    turnLeft(150);
+    turnLeft(pwm_speed);
   } else if (command.startsWith("R")) {
     Serial.println("ACK: Turning Right");
-    turnRight(150);
+    turnRight(pwm_speed);
   } else if (command.startsWith("S")) {
     Serial.println("ACK: Stopping");
     stopMotors();
