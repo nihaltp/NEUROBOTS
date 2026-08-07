@@ -54,7 +54,8 @@ void setup() {
     setupMotors();
     setupPump();
     stopMotors();
-    pumpOff();
+    pumpOff(1);
+    pumpOff(2);
 
     Serial.print("Setting up Access Point: ");
     Serial.println(ssid);

@@ -20,7 +20,8 @@ void setup() {
   setupPump();
 
   stopMotors();
-  pumpOff();
+  pumpOff(1);
+  pumpOff(2);
   Serial.println("Initialization Complete.");
 }
 

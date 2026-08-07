@@ -34,3 +34,11 @@ wifi:
   esp_ip: "192.168.4.1"
   esp_port: 12345
   local_port: 12346
+
+pump_control:
+  mapping:
+    "Tomato with Late Blight": 1
+    "Tomato with Early Blight": 2
+  durations:
+    1: 1.5
+    2: 3.0

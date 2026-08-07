@@ -87,6 +87,76 @@ def generate_frames():
             logger.error(f"Error reading frame: {e}")
             time.sleep(0.1)
 
+def send_command(command):
+    if connection_case == 'a':
+        if ser and ser.is_open:
+            with serial_lock:
+                try:
+                    ser.reset_input_buffer()
+                    ser.write((command + '\n').encode('utf-8'))
+                    
+                    # Wait for ACK or ERR (relies on serial timeout=1)
+                    response = ser.readline().decode('utf-8', errors='ignore').strip()
+                    if response.startswith('ACK'):
+                        logger.info(f"ESP32 Acknowledged: {response}")
+                        return {'status': 'success', 'command': command, 'response': response}, 200
+                    elif response.startswith('ERR'):
+                        logger.error(f"ESP32 Error: {response}")
+                        return {'error': response}, 400
+                    else:
+                        logger.warning(f"Timeout or unknown response for command '{command}': '{response}'")
+                        return {'error': 'Timeout or unknown response from robot'}, 504
+                        
+                except Exception as e:
+                    logger.error(f"Failed to write to serial: {e}")
+                    return {'error': str(e)}, 500
+        else:
+            logger.warning(f"Serial port not available. Command '{command}' dropped.")
+            return {'error': 'Serial port not connected'}, 503
+    else:
+        if wifi_comms:
+            try:
+                # Send the command via UDP
+                wifi_comms.send_message(esp_ip, esp_port, command + '\n')
+                
+                # Optionally, we could wait for a response, but UDP is connectionless.
+                # We'll just assume success for now, or check for a quick reply.
+                start_time = time.time()
+                response = None
+                while time.time() - start_time < 1.0:
+                    msg, addr = wifi_comms.receive_message()
+                    if msg:
+                        response = msg.strip()
+                        break
+                    time.sleep(0.01)
+                    
+                if response:
+                    if response.startswith('ACK'):
+                        logger.info(f"ESP32 Acknowledged: {response}")
+                        return {'status': 'success', 'command': command, 'response': response}, 200
+                    elif response.startswith('ERR'):
+                        logger.error(f"ESP32 Error: {response}")
+                        return {'error': response}, 400
+                    else:
+                        logger.info(f"ESP32 Replied: {response}")
+                        return {'status': 'success', 'command': command, 'response': response}, 200
+                else:
+                    logger.warning(f"No response from ESP32 for command '{command}'")
+                    # With UDP, we might not get an ACK reliably, so still return success but note timeout
+                    return {'status': 'success', 'command': command, 'note': 'No response from robot'}, 200
+                    
+            except Exception as e:
+                logger.error(f"Failed to send over WiFi: {e}")
+                return {'error': str(e)}, 500
+        else:
+            logger.warning(f"WiFi comms not initialized. Command '{command}' dropped.")
+            return {'error': 'WiFi not available'}, 503
+
+def pump_off_delayed(pump_id, delay):
+    time.sleep(delay)
+    logger.info(f"Turning off pump {pump_id} after {delay} seconds")
+    send_command(f"P{pump_id}:0")
+
 def detection_listener():
     """Background task to listen for detections and push to clients."""
     global total_diseases_detected
@@ -110,6 +180,17 @@ def detection_listener():
                     total_diseases_detected += 1
                     disease_counts[class_name] = disease_counts.get(class_name, 0) + 1
                     logger.info(f"New instance of {class_name} detected. Total count: {total_diseases_detected}")
+                    
+                    # Check pump mapping
+                    pump_mapping = config.get('pump_control', {}).get('mapping', {})
+                    if class_name in pump_mapping:
+                        pump_id = pump_mapping[class_name]
+                        durations = config.get('pump_control', {}).get('durations', {})
+                        duration = durations.get(pump_id, durations.get(str(pump_id), 3.0))
+                        
+                        logger.info(f"Automated action: Turning on pump {pump_id} for {duration} seconds for disease {class_name}")
+                        send_command(f"P{pump_id}:1")
+                        threading.Thread(target=pump_off_delayed, args=(pump_id, duration), daemon=True).start()
                 
                 # Always update last_seen if detected in this frame
                 active_detections[class_name] = current_time
@@ -139,69 +220,8 @@ def handle_command():
     
     logger.info(f"Received command: {command}")
     
-    if connection_case == 'a':
-        if ser and ser.is_open:
-            with serial_lock:
-                try:
-                    ser.reset_input_buffer()
-                    ser.write((command + '\n').encode('utf-8'))
-                    
-                    # Wait for ACK or ERR (relies on serial timeout=1)
-                    response = ser.readline().decode('utf-8', errors='ignore').strip()
-                    if response.startswith('ACK'):
-                        logger.info(f"ESP32 Acknowledged: {response}")
-                        return jsonify({'status': 'success', 'command': command, 'response': response})
-                    elif response.startswith('ERR'):
-                        logger.error(f"ESP32 Error: {response}")
-                        return jsonify({'error': response}), 400
-                    else:
-                        logger.warning(f"Timeout or unknown response for command '{command}': '{response}'")
-                        return jsonify({'error': 'Timeout or unknown response from robot'}), 504
-                        
-                except Exception as e:
-                    logger.error(f"Failed to write to serial: {e}")
-                    return jsonify({'error': str(e)}), 500
-        else:
-            logger.warning(f"Serial port not available. Command '{command}' dropped.")
-            return jsonify({'error': 'Serial port not connected'}), 503
-    else:
-        if wifi_comms:
-            try:
-                # Send the command via UDP
-                wifi_comms.send_message(esp_ip, esp_port, command + '\n')
-                
-                # Optionally, we could wait for a response, but UDP is connectionless.
-                # We'll just assume success for now, or check for a quick reply.
-                start_time = time.time()
-                response = None
-                while time.time() - start_time < 1.0:
-                    msg, addr = wifi_comms.receive_message()
-                    if msg:
-                        response = msg.strip()
-                        break
-                    time.sleep(0.01)
-                    
-                if response:
-                    if response.startswith('ACK'):
-                        logger.info(f"ESP32 Acknowledged: {response}")
-                        return jsonify({'status': 'success', 'command': command, 'response': response})
-                    elif response.startswith('ERR'):
-                        logger.error(f"ESP32 Error: {response}")
-                        return jsonify({'error': response}), 400
-                    else:
-                        logger.info(f"ESP32 Replied: {response}")
-                        return jsonify({'status': 'success', 'command': command, 'response': response})
-                else:
-                    logger.warning(f"No response from ESP32 for command '{command}'")
-                    # With UDP, we might not get an ACK reliably, so still return success but note timeout
-                    return jsonify({'status': 'success', 'command': command, 'note': 'No response from robot'}), 200
-                    
-            except Exception as e:
-                logger.error(f"Failed to send over WiFi: {e}")
-                return jsonify({'error': str(e)}), 500
-        else:
-            logger.warning(f"WiFi comms not initialized. Command '{command}' dropped.")
-            return jsonify({'error': 'WiFi not available'}), 503
+    response_data, status_code = send_command(command)
+    return jsonify(response_data), status_code
 
 @app.route('/video_feed')
 def video_feed():

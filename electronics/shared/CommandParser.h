@@ -21,12 +21,19 @@ void processCommand(String command) {
   } else if (command.startsWith("S")) {
     Serial.println("ACK: Stopping");
     stopMotors();
-  } else if (command.startsWith("P1")) {
-    Serial.println("ACK: Pump ON");
-    pumpOn(255);
-  } else if (command.startsWith("P0")) {
-    Serial.println("ACK: Pump OFF");
-    pumpOff();
+  } else if (command.startsWith("P1:1")) {
+    Serial.println("ACK: Pump 1 ON");
+    pumpOn(1, 255);
+  } else if (command.startsWith("P1:0")) {
+    Serial.println("ACK: Pump 1 OFF");
+    pumpOff(1);
+  } else if (command.startsWith("P2:1")) {
+    Serial.println("ACK: Pump 2 ON");
+    pumpOn(2, 255);
+  } else if (command.startsWith("P2:0")) {
+    Serial.println("ACK: Pump 2 OFF");
+    pumpOff(2);
+
   } else {
     Serial.print("ERR: Unknown Command: ");
     Serial.println(command);
