@@ -6,7 +6,8 @@ import logging
 import zmq
 import sys
 import os
-from ultralytics import YOLO
+import numpy as np
+import onnxruntime as ort
 
 # Add parent directory to path to import config_loader
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,10 +17,40 @@ from config_loader import load_config
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# ImageNet normalization values (used by the HuggingFace MobileNetV2 preprocessor)
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+INPUT_SIZE = 224
+
+
+def preprocess_frame(frame):
+    """
+    Preprocess a BGR OpenCV frame for the MobileNetV2 classifier.
+    1. Resize to 224x224
+    2. Convert BGR -> RGB
+    3. Scale to [0, 1]
+    4. Normalize with ImageNet mean/std
+    5. Transpose to CHW and add batch dimension -> (1, 3, 224, 224)
+    """
+    img = cv2.resize(frame, (INPUT_SIZE, INPUT_SIZE))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = img.astype(np.float32) / 255.0
+    img = (img - IMAGENET_MEAN) / IMAGENET_STD
+    img = np.transpose(img, (2, 0, 1))  # HWC -> CHW
+    img = np.expand_dims(img, axis=0)    # Add batch dim
+    return img
+
+
+def softmax(logits):
+    """Compute softmax probabilities from logits."""
+    exp = np.exp(logits - np.max(logits, axis=-1, keepdims=True))
+    return exp / np.sum(exp, axis=-1, keepdims=True)
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Headless Plant Disease Detection")
-    parser.add_argument("--show", action="store_true", help="Display the camera feed with bounding boxes for local testing.")
-    parser.add_argument("--debug", action="store_true", help="Enable debug logging and verbose model output.")
+    parser = argparse.ArgumentParser(description="Headless Plant Disease Classification")
+    parser.add_argument("--show", action="store_true", help="Display the camera feed with classification overlay for local testing.")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging and verbose output.")
     args = parser.parse_args()
 
     if args.debug:
@@ -59,13 +90,27 @@ def main():
     logger.info(f"Control Subscriber bound to port {config['zmq']['control_port']}")
 
     model_path = config['model']['path']
+    labels_path = config['model'].get('labels', 'weights/labels.json')
     confidence_threshold = config['model'].get('confidence_threshold', 0.5)
     
+    # Load ONNX model
     try:
-        model = YOLO(model_path, task='detect')
-        logger.info(f"Model loaded successfully from {model_path}")
+        session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+        input_name = session.get_inputs()[0].name
+        logger.info(f"ONNX model loaded successfully from {model_path}")
     except Exception as e:
-        logger.error(f"Failed to load model from {model_path}: {e}")
+        logger.error(f"Failed to load ONNX model from {model_path}: {e}")
+        return
+
+    # Load class labels
+    try:
+        with open(labels_path, 'r') as f:
+            labels = json.load(f)
+        # Ensure keys are ints
+        labels = {int(k): v for k, v in labels.items()}
+        logger.info(f"Loaded {len(labels)} class labels from {labels_path}")
+    except Exception as e:
+        logger.error(f"Failed to load labels from {labels_path}: {e}")
         return
 
     cam_type = config['camera'].get('type', 'usb')
@@ -112,43 +157,47 @@ def main():
             frame_detections = []
             
             if detection_enabled:
-                # Run inference
-                results = model.predict(source=frame, verbose=args.debug, device='cpu')
+                # Preprocess and run classification
+                input_tensor = preprocess_frame(frame)
+                outputs = session.run(None, {input_name: input_tensor})
+                logits = outputs[0][0]  # Shape: (num_classes,)
                 
-                for result in results:
-                    boxes = result.boxes
-                    for box in boxes:
-                        conf = float(box.conf[0])
-                        if conf < confidence_threshold:
-                            continue
-                            
-                        x1, y1, x2, y2 = box.xyxy[0].tolist()
-                        cls_idx = int(box.cls[0])
-                        class_name = model.names[cls_idx]
-                        
-                        frame_detections.append({
-                            "class_name": class_name,
-                            "confidence": round(conf, 4),
-                            "bbox": {
-                                "x_min": int(x1),
-                                "y_min": int(y1),
-                                "x_max": int(x2),
-                                "y_max": int(y2)
-                            }
-                        })
-                        
-                        if args.show:
-                            cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                            label = f"{class_name}: {conf:.2f}"
-                            cv2.putText(frame, label, (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                # Get probabilities
+                probs = softmax(logits)
+                top_idx = int(np.argmax(probs))
+                top_conf = float(probs[top_idx])
                 
+                if top_conf >= confidence_threshold:
+                    class_name = labels.get(top_idx, f"Unknown ({top_idx})")
+                    
+                    frame_detections.append({
+                        "class_name": class_name,
+                        "confidence": round(top_conf, 4),
+                    })
+                    
+                    if args.show:
+                        label = f"{class_name}: {top_conf:.2f}"
+                        cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                
+                elif args.show:
+                    # Show top prediction even below threshold (in red)
+                    class_name = labels.get(top_idx, f"Unknown ({top_idx})")
+                    label = f"{class_name}: {top_conf:.2f} (low)"
+                    cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+
+                if args.debug:
+                    # Log top 3 predictions
+                    top3_indices = np.argsort(probs)[-3:][::-1]
+                    for i, idx in enumerate(top3_indices):
+                        logger.debug(f"  Top-{i+1}: {labels.get(int(idx), idx)} ({probs[idx]:.4f})")
+
                 # Publish detections
                 output_payload = {
                     "timestamp": time.time(),
                     "detections": frame_detections
                 }
                 if args.debug and frame_detections:
-                    logger.debug(f"Detected {len(frame_detections)} objects.")
+                    logger.debug(f"Classified as: {frame_detections[0]['class_name']} ({frame_detections[0]['confidence']:.4f})")
                 det_pub.send_string(json.dumps(output_payload))
                 
             # Publish frame as JPEG
@@ -156,12 +205,12 @@ def main():
             frame_pub.send(buffer.tobytes())
             
             if args.show:
-                cv2.imshow('Plant Disease Detection', frame)
+                cv2.imshow('Plant Disease Classification', frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
     except KeyboardInterrupt:
-        logger.info("Stopping detector script gracefully...")
+        logger.info("Stopping classifier script gracefully...")
     finally:
         cap.release()
         frame_pub.close()
