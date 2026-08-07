@@ -122,6 +122,9 @@ def main():
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down...")
     finally:
+        logger.info("Sending HALT ALL command to rover before shutdown...")
+        send_command("STOPALL")
+        time.sleep(0.5) # Give it a moment to send before killing server
         logger.info("Terminating subprocesses...")
         server_process.terminate()
         detection_process.terminate()

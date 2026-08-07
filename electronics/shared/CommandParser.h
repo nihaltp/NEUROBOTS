@@ -43,6 +43,11 @@ void processCommand(String command) {
   } else if (command.startsWith("P2:0")) {
     Serial.println("ACK: Pump 2 OFF");
     pumpOff(2);
+  } else if (command.startsWith("STOPALL")) {
+    Serial.println("ACK: HALT ALL");
+    stopMotors();
+    pumpOff(1);
+    pumpOff(2);
 
   } else {
     Serial.print("ERR: Unknown Command: ");
