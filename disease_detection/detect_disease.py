@@ -170,20 +170,23 @@ def main():
                 if top_conf >= confidence_threshold:
                     class_name = labels.get(top_idx, f"Unknown ({top_idx})")
                     
-                    frame_detections.append({
-                        "class_name": class_name,
-                        "confidence": round(top_conf, 4),
-                    })
-                    
-                    if args.show:
-                        label = f"{class_name}: {top_conf:.2f}"
-                        cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    # Only report the detection if it's a Tomato class
+                    if "Tomato" in class_name:
+                        frame_detections.append({
+                            "class_name": class_name,
+                            "confidence": round(top_conf, 4),
+                        })
+                        
+                        if args.show:
+                            label = f"{class_name}: {top_conf:.2f}"
+                            cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
                 
                 elif args.show:
                     # Show top prediction even below threshold (in red)
                     class_name = labels.get(top_idx, f"Unknown ({top_idx})")
-                    label = f"{class_name}: {top_conf:.2f} (low)"
-                    cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                    if "Tomato" in class_name:
+                        label = f"{class_name}: {top_conf:.2f} (low)"
+                        cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
                 if args.debug:
                     # Log top 3 predictions
