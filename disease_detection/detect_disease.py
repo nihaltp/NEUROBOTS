@@ -133,6 +133,10 @@ def main():
 
     detection_enabled = True # Default state
     
+    active_display_detection = None
+    display_until_time = 0.0
+    display_duration = config['model'].get('display_duration', 3.0)
+    
     try:
         while True:
             # Check for control messages
@@ -172,14 +176,19 @@ def main():
                     
                     # Only report the detection if it's a Tomato class
                     if "Tomato" in class_name:
-                        frame_detections.append({
-                            "class_name": class_name,
-                            "confidence": round(top_conf, 4),
-                        })
-                        
-                        if args.show:
-                            label = f"{class_name}: {top_conf:.2f}"
-                            cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                        active_display_detection = (class_name, round(top_conf, 4))
+                        display_until_time = time.time() + display_duration
+
+                if active_display_detection and time.time() < display_until_time:
+                    disp_class_name, disp_conf = active_display_detection
+                    frame_detections.append({
+                        "class_name": disp_class_name,
+                        "confidence": disp_conf,
+                    })
+                    
+                    if args.show:
+                        label = f"{disp_class_name}: {disp_conf:.2f}"
+                        cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
                 
                 elif args.show:
                     # Show top prediction even below threshold (in red)

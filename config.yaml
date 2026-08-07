@@ -1,6 +1,6 @@
 camera:
   type: "usb" # Change to "ip" to use an IP camera
-  index: 0
+  index: 1
   ip_url: "http://192.168.1.100:8080/video" # Update with the URL from your IP camera app
   width: 640
   height: 480
@@ -11,6 +11,7 @@ model:
   labels: "weights/labels.json"
   confidence_threshold: 0.25
   cooldown_period: 5
+  display_duration: 1.0
 
 zmq:
   frame_port: 5555
