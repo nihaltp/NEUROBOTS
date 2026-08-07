@@ -91,9 +91,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const yPos = 30 + (index * 30);
                 
                 // Draw Label Text
-                ctx.fillStyle = '#2ecc71';
-                ctx.font = '20px Inter, sans-serif';
-                ctx.fontWeight = 'bold';
+                ctx.font = 'bold 20px Inter, sans-serif';
+                
+                // Outline
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.strokeText(`${className}: ${conf}`, 10, yPos);
+                
+                // Bright Green Fill
+                ctx.fillStyle = '#64FF64';
                 ctx.fillText(`${className}: ${conf}`, 10, yPos);
                 
                 // Update UI list
