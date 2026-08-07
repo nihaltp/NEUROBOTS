@@ -29,3 +29,8 @@ logging:
 serial:
   port: "COM3"
   baudrate: 115200
+
+wifi:
+  esp_ip: "192.168.4.1"
+  esp_port: 12345
+  local_port: 12346
