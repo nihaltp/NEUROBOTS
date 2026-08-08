@@ -56,6 +56,7 @@ def run_movement_sequence(config, send_command):
                 for det in data.get('detections', []):
                     classes_in_frame.add(det['class_name'])
                     
+                is_healthy_detected = False
                 for class_name in classes_in_frame:
                     if "Tomato" in class_name and class_name != "Healthy Tomato Plant":
                         pump_mapping = config.get('pump_control', {}).get('mapping', {})
@@ -86,8 +87,14 @@ def run_movement_sequence(config, send_command):
                             
                             detected = True
                             break
+                    elif "Healthy" in class_name:
+                        is_healthy_detected = True
                             
                 if detected:
+                    break
+                elif is_healthy_detected:
+                    logger.info("Healthy plant detected. Proceeding forward.")
+                    detected = True
                     break
 
         except Exception as e:
