@@ -47,7 +47,9 @@ def autonomous_loop(config):
     logger.info("Starting autonomous movement loop...")
     
     # Start moving forward by default
-    send_command('F:50')
+    current_command = 'F:50'
+    send_command(current_command)
+    last_heartbeat_time = time.time()
     
     while True:
         try:
@@ -70,25 +72,47 @@ def autonomous_loop(config):
                         
                         logger.info(f"Target disease '{class_name}' detected! Stopping rover.")
                         # Stop rover
-                        send_command('S')
-                        time.sleep(0.5) # Give it time to stop
+                        current_command = 'S'
+                        send_command(current_command)
+                        
+                        # Wait a bit for rover to stop, while keeping watchdog happy
+                        stop_start = time.time()
+                        while time.time() - stop_start < 0.5:
+                            time.sleep(0.1)
+                            send_command(current_command)
                         
                         logger.info(f"Turning on pump {pump_id} for {duration} seconds.")
-                        send_command(f"P{pump_id}:1")
+                        pump_on_cmd = f"P{pump_id}:1"
+                        send_command(pump_on_cmd)
                         
-                        time.sleep(duration)
+                        pump_start = time.time()
+                        while time.time() - pump_start < duration:
+                            time.sleep(min(0.5, duration - (time.time() - pump_start)))
+                            # Re-send pump command to prevent ESP32 from timing out during long durations
+                            send_command(pump_on_cmd)
                         
                         logger.info(f"Turning off pump {pump_id}.")
-                        send_command(f"P{pump_id}:0")
-                        time.sleep(0.5) # Give pump time to stop
+                        pump_off_cmd = f"P{pump_id}:0"
+                        send_command(pump_off_cmd)
+                        
+                        off_start = time.time()
+                        while time.time() - off_start < 0.5:
+                            time.sleep(0.1)
+                            send_command(pump_off_cmd)
                         
                         logger.info("Resuming forward movement.")
-                        send_command('F:50')
+                        current_command = 'F:50'
+                        send_command(current_command)
+                        last_heartbeat_time = time.time()
                         
                 # Update last seen to prevent rapid re-triggering while still in frame
                 active_detections[class_name] = current_time
                 
         except zmq.Again:
+            # If no detection message, check if we need to send a heartbeat
+            if time.time() - last_heartbeat_time > 1.0:
+                send_command(current_command)
+                last_heartbeat_time = time.time()
             time.sleep(0.05)
         except Exception as e:
             logger.error(f"Error in autonomous loop: {e}")
