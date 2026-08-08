@@ -60,8 +60,11 @@ def main():
     # Load configuration
     try:
         config = load_config()
+    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+        logger.exception(f"Failed to load config due to file or format error: {e}")
+        return
     except Exception as e:
-        logger.error(f"Failed to load config: {e}")
+        logger.exception(f"Unexpected error loading config: {e}")
         return
 
     if not args.debug:
@@ -106,8 +109,11 @@ def main():
             session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
             input_name = session.get_inputs()[0].name
             logger.info(f"ONNX model loaded successfully from {model_path}")
+        except ort.OrtError as e:
+            logger.exception(f"ONNX Runtime error loading model from {model_path}: {e}")
+            return
         except Exception as e:
-            logger.error(f"Failed to load ONNX model from {model_path}: {e}")
+            logger.exception(f"Unexpected error loading ONNX model from {model_path}: {e}")
             return
 
         # Load class labels
@@ -117,8 +123,11 @@ def main():
             # Ensure keys are ints
             labels = {int(k): v for k, v in labels.items()}
             logger.info(f"Loaded {len(labels)} class labels from {labels_path}")
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logger.exception(f"Failed to load labels from {labels_path}: {e}")
+            return
         except Exception as e:
-            logger.error(f"Failed to load labels from {labels_path}: {e}")
+            logger.exception(f"Unexpected error loading labels from {labels_path}: {e}")
             return
 
         cam_type = config['camera'].get('type', 'usb')

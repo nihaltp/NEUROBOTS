@@ -97,8 +97,11 @@ def run_movement_sequence(config, send_command):
                     detected = True
                     break
 
+        except zmq.ZMQError as e:
+            logger.exception(f"ZMQ Error in autonomous loop: {e}")
+            time.sleep(2)
         except Exception as e:
-            logger.error(f"Error in autonomous loop: {e}")
+            logger.exception(f"Unexpected error in autonomous loop: {e}")
             time.sleep(2)
 
 if __name__ == "__main__":
@@ -122,13 +125,18 @@ if __name__ == "__main__":
                 logger.info(f"Command '{command}' sent successfully.")
             else:
                 logger.warning(f"Failed to send command '{command}': {response.text}")
+        except requests.exceptions.RequestException as e:
+            logger.exception(f"Network error sending command '{command}': {e}")
         except Exception as e:
-            logger.error(f"Error sending command '{command}': {e}")
+            logger.exception(f"Unexpected error sending command '{command}': {e}")
 
     try:
         config = load_config()
+    except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+        logger.exception(f"Failed to load config due to file or format error: {e}")
+        sys.exit(1)
     except Exception as e:
-        logger.error(f"Failed to load config: {e}")
+        logger.exception(f"Unexpected error loading config: {e}")
         sys.exit(1)
 
     try:

@@ -51,7 +51,7 @@ class BLEComms:
                             await self.client.start_notify(self.status_char_uuid, self._notification_handler)
                             
                     except Exception as e:
-                        logger.error(f"Failed to connect to {self.device_name}: {e}")
+                        logger.exception(f"Failed to connect to {self.device_name}: {e}")
                         await asyncio.sleep(2)
                 else:
                     await asyncio.sleep(2)
@@ -69,7 +69,7 @@ class BLEComms:
                             # Add back to the front of the queue
                             self._requeue(command)
                     except Exception as e:
-                        logger.error(f"Error sending BLE command: {e}")
+                        logger.exception(f"Error sending BLE command: {e}")
                         self._requeue(command)
                         self._trigger_reconnect()
                 except queue.Empty:
@@ -85,7 +85,7 @@ class BLEComms:
                 if self.service_uuid.lower() in [u.lower() for u in adv.service_uuids]:
                     return d
         except Exception as e:
-            logger.error(f"Error scanning for BLE devices: {e}")
+            logger.exception(f"Error scanning for BLE devices: {e}")
         return None
 
     def _handle_disconnect(self, client):

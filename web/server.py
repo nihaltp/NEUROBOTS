@@ -47,8 +47,10 @@ serial_baud = config.get('serial', {}).get('baudrate', 115200)
 try:
     ser = serial.Serial(serial_port, serial_baud, timeout=1)
     logger.info(f"Connected to serial port {serial_port} at {serial_baud}")
+except serial.SerialException as e:
+    logger.exception(f"Serial error connecting to {serial_port}: {e}")
 except Exception as e:
-    logger.error(f"Failed to connect to serial port {serial_port}: {e}")
+    logger.exception(f"Failed to connect to serial port {serial_port}: {e}")
 
 # Always initialize WiFi
 esp_ip = config.get('wifi', {}).get('esp_ip', '192.168.4.1')
@@ -59,7 +61,7 @@ try:
     wifi_comms = WiFiComms(local_port=local_port)
     logger.info(f"WiFi Comms initialized. Target ESP32: {esp_ip}:{esp_port}")
 except Exception as e:
-    logger.error(f"Failed to initialize WiFi Comms: {e}")
+    logger.exception(f"Failed to initialize WiFi Comms: {e}")
 
 # Initialize BLE if starting in case 'c'
 def ble_ack_callback(payload):
@@ -77,7 +79,7 @@ if ble_config and connection_case == 'c':
         )
         logger.info("BLE Comms initialized in background thread.")
     except Exception as e:
-        logger.error(f"Failed to initialize BLE Comms: {e}")
+        logger.exception(f"Failed to initialize BLE Comms: {e}")
 
 # ZMQ Context
 context = zmq.Context()
@@ -113,8 +115,11 @@ def frame_acquisition_worker():
                 except queue.Empty:
                     pass
             frame_queue.put(frame)
+        except zmq.ZMQError as e:
+            logger.exception(f"ZMQ Error in frame acquisition: {e}")
+            time.sleep(0.1)
         except Exception as e:
-            logger.error(f"Error in frame acquisition: {e}")
+            logger.exception(f"Error in frame acquisition: {e}")
             time.sleep(0.1)
 
 def generate_frames():
@@ -125,7 +130,7 @@ def generate_frames():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
         except Exception as e:
-            logger.error(f"Error yielding frame: {e}")
+            logger.exception(f"Error yielding frame: {e}")
             time.sleep(0.1)
 
 def send_command(command):
@@ -148,8 +153,11 @@ def send_command(command):
                         logger.warning(f"Timeout or unknown response for command '{command}': '{response}'")
                         return {'error': 'Timeout or unknown response from robot'}, 504
                         
+                except serial.SerialException as e:
+                    logger.exception(f"Serial error writing to {serial_port}: {e}")
+                    return {'error': str(e)}, 500
                 except Exception as e:
-                    logger.error(f"Failed to write to serial: {e}")
+                    logger.exception(f"Failed to write to serial: {e}")
                     return {'error': str(e)}, 500
         else:
             logger.warning(f"Serial port not available. Command '{command}' dropped.")
@@ -187,7 +195,7 @@ def send_command(command):
                     return {'status': 'success', 'command': command, 'note': 'No response from robot'}, 200
                     
             except Exception as e:
-                logger.error(f"Failed to send over WiFi: {e}")
+                logger.exception(f"Failed to send over WiFi: {e}")
                 return {'error': str(e)}, 500
         else:
             logger.warning(f"WiFi comms not initialized. Command '{command}' dropped.")
@@ -254,8 +262,11 @@ def detection_listener():
                     detector_online = False
                     socketio.emit('detector_status', {'status': 'offline'})
                     
+        except zmq.ZMQError as e:
+            logger.exception(f"ZMQ Error in detection listener: {e}")
+            time.sleep(0.1)
         except Exception as e:
-            logger.error(f"Error in detection listener: {e}")
+            logger.exception(f"Error in detection listener: {e}")
             time.sleep(0.1)
 
 def heartbeat_sender():
@@ -264,7 +275,7 @@ def heartbeat_sender():
         try:
             control_pub.send_string(json.dumps({'heartbeat': True, 'timestamp': time.time()}))
         except Exception as e:
-            logger.error(f"Error sending heartbeat: {e}")
+            logger.exception(f"Error sending heartbeat: {e}")
         time.sleep(1)
 
 @app.route('/')
@@ -299,7 +310,7 @@ def set_connection():
                     )
                     logger.info("BLE Comms initialized in background thread.")
                 except Exception as e:
-                    logger.error(f"Failed to initialize BLE Comms: {e}")
+                    logger.exception(f"Failed to initialize BLE Comms: {e}")
         elif mode != 'c' and ble_comms:
             ble_comms.close()
             ble_comms = None
