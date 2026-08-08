@@ -72,79 +72,85 @@ def main():
 
     # Setup ZMQ Context and Sockets
     context = zmq.Context()
+    frame_pub = None
+    det_pub = None
+    control_sub = None
+    cap = None
     
-    # Frame Publisher
-    frame_pub = context.socket(zmq.PUB)
-    frame_pub.setsockopt(zmq.LINGER, 0)
-    frame_pub.bind(f"tcp://*:{config['zmq']['frame_port']}")
-    logger.info(f"Frame Publisher bound to port {config['zmq']['frame_port']}")
-    
-    # Detection Publisher
-    det_pub = context.socket(zmq.PUB)
-    det_pub.setsockopt(zmq.LINGER, 0)
-    det_pub.bind(f"tcp://*:{config['zmq']['detection_port']}")
-    logger.info(f"Detection Publisher bound to port {config['zmq']['detection_port']}")
-    
-    # Control Subscriber
-    control_sub = context.socket(zmq.SUB)
-    control_sub.setsockopt(zmq.LINGER, 0)
-    control_sub.bind(f"tcp://*:{config['zmq']['control_port']}")
-    control_sub.setsockopt_string(zmq.SUBSCRIBE, "")
-    logger.info(f"Control Subscriber bound to port {config['zmq']['control_port']}")
-
-    model_path = config['model']['path']
-    labels_path = config['model'].get('labels', 'weights/labels.json')
-    confidence_threshold = config['model'].get('confidence_threshold', 0.5)
-    
-    # Load ONNX model
     try:
-        session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
-        input_name = session.get_inputs()[0].name
-        logger.info(f"ONNX model loaded successfully from {model_path}")
-    except Exception as e:
-        logger.error(f"Failed to load ONNX model from {model_path}: {e}")
-        return
-
-    # Load class labels
-    try:
-        with open(labels_path, 'r') as f:
-            labels = json.load(f)
-        # Ensure keys are ints
-        labels = {int(k): v for k, v in labels.items()}
-        logger.info(f"Loaded {len(labels)} class labels from {labels_path}")
-    except Exception as e:
-        logger.error(f"Failed to load labels from {labels_path}: {e}")
-        return
-
-    cam_type = config['camera'].get('type', 'usb')
-    if cam_type == 'ip':
-        cam_source = config['camera'].get('ip_url', '')
-    else:
-        cam_source = config['camera'].get('index', 0)
-
-    cap = cv2.VideoCapture(cam_source)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, config['camera']['width'])
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config['camera']['height'])
-    if 'fps' in config['camera']:
-        cap.set(cv2.CAP_PROP_FPS, config['camera']['fps'])
-
-    if not cap.isOpened():
-        logger.error(f"Failed to open the webcam ({cam_type}: {cam_source}).")
-        return
+        # Frame Publisher
+        frame_pub = context.socket(zmq.PUB)
+        frame_pub.setsockopt(zmq.LINGER, 0)
+        frame_pub.bind(f"tcp://*:{config['zmq']['frame_port']}")
+        logger.info(f"Frame Publisher bound to port {config['zmq']['frame_port']}")
         
-    logger.info("Webcam opened successfully.")
+        # Detection Publisher
+        det_pub = context.socket(zmq.PUB)
+        det_pub.setsockopt(zmq.LINGER, 0)
+        det_pub.bind(f"tcp://*:{config['zmq']['detection_port']}")
+        logger.info(f"Detection Publisher bound to port {config['zmq']['detection_port']}")
+        
+        # Control Subscriber
+        control_sub = context.socket(zmq.SUB)
+        control_sub.setsockopt(zmq.LINGER, 0)
+        control_sub.bind(f"tcp://*:{config['zmq']['control_port']}")
+        control_sub.setsockopt_string(zmq.SUBSCRIBE, "")
+        logger.info(f"Control Subscriber bound to port {config['zmq']['control_port']}")
 
-    detection_enabled = True # Default state
-    
-    active_display_detection = None
-    display_until_time = 0.0
-    display_duration = config['model'].get('display_duration', 3.0)
-    
-    last_heartbeat_time = 0
-    client_connected = False
-    last_det_heartbeat = 0
-    
-    try:
+        model_path = config['model']['path']
+        labels_path = config['model'].get('labels', 'weights/labels.json')
+        confidence_threshold = config['model'].get('confidence_threshold', 0.5)
+        
+        # Load ONNX model
+        try:
+            session = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+            input_name = session.get_inputs()[0].name
+            logger.info(f"ONNX model loaded successfully from {model_path}")
+        except Exception as e:
+            logger.error(f"Failed to load ONNX model from {model_path}: {e}")
+            return
+
+        # Load class labels
+        try:
+            with open(labels_path, 'r') as f:
+                labels = json.load(f)
+            # Ensure keys are ints
+            labels = {int(k): v for k, v in labels.items()}
+            logger.info(f"Loaded {len(labels)} class labels from {labels_path}")
+        except Exception as e:
+            logger.error(f"Failed to load labels from {labels_path}: {e}")
+            return
+
+        cam_type = config['camera'].get('type', 'usb')
+        if cam_type == 'ip':
+            cam_source = config['camera'].get('ip_url', '')
+            # Set a 5-second timeout for IP cameras so it doesn't block Ctrl+C for 90 seconds
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "timeout;5000000"
+        else:
+            cam_source = config['camera'].get('index', 0)
+
+        cap = cv2.VideoCapture(cam_source)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, config['camera']['width'])
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config['camera']['height'])
+        if 'fps' in config['camera']:
+            cap.set(cv2.CAP_PROP_FPS, config['camera']['fps'])
+
+        if not cap.isOpened():
+            logger.error(f"Failed to open the webcam ({cam_type}: {cam_source}).")
+            return
+            
+        logger.info("Webcam opened successfully.")
+
+        detection_enabled = True # Default state
+        
+        active_display_detection = None
+        display_until_time = 0.0
+        display_duration = config['model'].get('display_duration', 3.0)
+        
+        last_heartbeat_time = 0
+        client_connected = False
+        last_det_heartbeat = 0
+        
         while True:
             # Check for control messages
             try:
@@ -250,10 +256,14 @@ def main():
     except KeyboardInterrupt:
         logger.info("Stopping classifier script gracefully...")
     finally:
-        cap.release()
-        frame_pub.close()
-        det_pub.close()
-        control_sub.close()
+        if cap:
+            cap.release()
+        if frame_pub:
+            frame_pub.close()
+        if det_pub:
+            det_pub.close()
+        if control_sub:
+            control_sub.close()
         context.term()
         if args.show:
             cv2.destroyAllWindows()
