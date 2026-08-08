@@ -7,12 +7,13 @@
  * - 1 Water Pump (L298N Driver)
  */
 
+#include "../shared/HardwareConfig.h"
 #include "../shared/Motors.h"
 #include "../shared/Pump.h"
 #include "../shared/CommandParser.h"
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_BAUD_RATE);
   delay(1000);
   Serial.println("Initializing System...");
 

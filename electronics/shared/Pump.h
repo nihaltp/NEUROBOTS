@@ -2,16 +2,7 @@
 #define PUMP_H
 
 #include <Arduino.h>
-
-// Pump 1 (L298N)
-const int PUMP1_IN1 = 14;
-const int PUMP1_IN2 = 12;
-const int PUMP1_ENA = 15;
-
-// Pump 2 (L298N)
-const int PUMP2_IN1 = 16;
-const int PUMP2_IN2 = 17;
-const int PUMP2_ENA = 18;
+#include "HardwareConfig.h"
 
 void setupPump() {
   pinMode(PUMP1_IN1, OUTPUT);

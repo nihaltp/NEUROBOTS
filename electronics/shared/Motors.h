@@ -2,15 +2,7 @@
 #define MOTORS_H
 
 #include <Arduino.h>
-
-// Motors (BTS7960)
-// Left
-const int MOTOR_L_RPWM = 25;
-const int MOTOR_L_LPWM = 26;
-
-// Right
-const int MOTOR_R_RPWM = 34;
-const int MOTOR_R_LPWM = 35;
+#include "HardwareConfig.h"
 
 void setupMotors() {
   pinMode(MOTOR_L_RPWM, OUTPUT);
