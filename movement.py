@@ -30,8 +30,8 @@ def check_camera_and_water(det_sub, config, send_command):
                     pump_id = pump_mapping[class_name]
                     duration = durations.get(pump_id, durations.get(str(pump_id), default_duration))
                 else:
-                    pump_id = 1
-                    duration = default_duration
+                    logger.warning(f"Unmapped disease '{class_name}' detected. Skipping spraying.")
+                    continue
                     
                 logger.info(f"Target disease '{class_name}' detected! Stopping rover.")
                 send_command('S')
