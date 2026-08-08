@@ -66,9 +66,13 @@ def autonomous_loop(config):
             for class_name in classes_in_frame:
                 last_seen = active_detections.get(class_name, 0)
                 if current_time - last_seen > cooldown_period:
-                    if class_name in pump_mapping:
-                        pump_id = pump_mapping[class_name]
-                        duration = durations.get(pump_id, durations.get(str(pump_id), default_duration))
+                    if "Tomato" in class_name and class_name != "Healthy Tomato Plant":
+                        if class_name in pump_mapping:
+                            pump_id = pump_mapping[class_name]
+                            duration = durations.get(pump_id, durations.get(str(pump_id), default_duration))
+                        else:
+                            pump_id = 1  # default to pump 1
+                            duration = default_duration
                         
                         logger.info(f"Target disease '{class_name}' detected! Stopping rover.")
                         # Stop rover
