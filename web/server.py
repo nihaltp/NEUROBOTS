@@ -8,6 +8,7 @@ from flask import Flask, render_template, Response, request, jsonify
 from flask_socketio import SocketIO
 import serial
 import threading
+import queue
 
 # Add parent directory to path to import config_loader and shared
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -99,15 +100,32 @@ control_pub = context.socket(zmq.PUB)
 control_pub.setsockopt(zmq.LINGER, 0)
 control_pub.connect(f"tcp://127.0.0.1:{config['zmq']['control_port']}")
 
+frame_queue = queue.Queue(maxsize=1)
+
+def frame_acquisition_worker():
+    """Background worker to continuously fetch frames and keep only the latest."""
+    while True:
+        try:
+            frame = frame_sub.recv()
+            if frame_queue.full():
+                try:
+                    frame_queue.get_nowait()
+                except queue.Empty:
+                    pass
+            frame_queue.put(frame)
+        except Exception as e:
+            logger.error(f"Error in frame acquisition: {e}")
+            time.sleep(0.1)
+
 def generate_frames():
     """Generator for MJPEG streaming."""
     while True:
         try:
-            frame = frame_sub.recv()
+            frame = frame_queue.get()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
         except Exception as e:
-            logger.error(f"Error reading frame: {e}")
+            logger.error(f"Error yielding frame: {e}")
             time.sleep(0.1)
 
 def send_command(command):
@@ -321,6 +339,7 @@ if __name__ == '__main__':
     # Start the background task for detections
     socketio.start_background_task(target=detection_listener)
     socketio.start_background_task(target=heartbeat_sender)
+    socketio.start_background_task(target=frame_acquisition_worker)
     
     host = config['server'].get('host', '0.0.0.0')
     port = config['server'].get('port', 5000)
