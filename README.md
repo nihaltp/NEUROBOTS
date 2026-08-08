@@ -1,6 +1,6 @@
 # NeuroBots Agricultural Robot Dashboard
 
-This project provides a headless web interface for controlling and monitoring the Raspberry Pi based agricultural robot. It features a low-latency MJPEG camera stream and live bounding box overlays using WebSockets, decoupled via ZeroMQ for high performance and extensibility.
+This project provides a headless web interface for controlling and monitoring the Raspberry Pi based agricultural robot. It features a low-latency MJPEG camera stream and live classification overlays using WebSockets, decoupled via ZeroMQ for high performance and extensibility.
 
 ## Project Structure
 
@@ -10,16 +10,18 @@ This project provides a headless web interface for controlling and monitoring th
 - `web/static/`: CSS and JS for the frontend
 - `config.yaml`: Centralized configuration.
 - `config_loader.py`: Script to load YAML config.
+- `master.py`: The main orchestration script that starts the web server, disease detection, and autonomous movement loop.
+- `movement.py`: Handles the autonomous movement sequence for the robot.
+- `electronics/`: Contains the ESP32/microcontroller code for rover movement and pump control.
+- `weights/`: Directory containing the optimized ONNX models for inference.
+- `shared/`: Shared utilities and code between different components.
 
 ## AI Model Details
 
-- **Architecture:** YOLOv11
-- **Source:** The model was originally trained in the Kaggle project [Plant Disease Object Detection Project | YOLOv11 by killa92](https://www.kaggle.com/code/killa92/plant-disease-object-detection-project-yolov11/).
-- **Dataset:** Trained on the **PlantDoc** dataset.
-- **Classes:** Capable of detecting 30 distinct classes of plant leaves and diseases (including various Apple, Corn, Tomato, and Potato diseases).
-- **Optimization:** We obtained the pre-trained weights from the Kaggle source and explicitly **optimized it** (exported to ONNX format as `weights/best.onnx`) for faster, lightweight inference on edge devices like the Raspberry Pi.
-
-*Note: For detailed metrics (like mAP, precision, and recall), please refer to the original Kaggle notebook's evaluation logs.*
+- **Architecture:** MobileNetV2 (Image Classification)
+- **Source:** The model is obtained from Hugging Face: [linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification](https://huggingface.co/linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification).
+- **Classes:** Capable of classifying various plant leaves and diseases. The pipeline is currently configured to focus on Tomato diseases.
+- **Optimization:** We obtained the pre-trained model and explicitly **optimized it** (exported to ONNX format as `weights/plant_disease_classifier.onnx`) for faster, lightweight CPU inference on edge devices like the Raspberry Pi.
 
 ## Dependencies
 

@@ -10,19 +10,25 @@ This folder contains the firmware for the robotics project based on the ESP32-S3
 
 ## Folder Structure
 
-The project code is organized into tests and the main application to ensure components can be verified independently.
+The project code is organized into specific implementations, tests, and shared code.
 
 ```text
 electronics/
-├── code/
-│   └── main/              # Combined main firmware for the entire robot
-│       └── main.ino
-│
-├── test/
-│   ├── bts_driver_test/   # Standalone test for the 4 DC Motors and BTS drivers
-│   │   └── bts_driver_test.ino
-│   └── pump_test/         # Standalone test for the water pump and L298N driver
-│       └── pump_test.ino
+├── main/                # Combined main firmware for the entire robot
+│   └── main.ino
+├── case_b/              # Connection Case B firmware implementation
+│   └── case_b.ino
+├── case_c/              # Connection Case C firmware implementation
+│   └── case_c.ino
+├── circuit/             # Circuit diagrams and related assets
+├── shared/              # Shared code and configurations
+└── test/                # Standalone test programs
+    ├── bts_driver_test/ # Standalone test for the 4 DC Motors and BTS drivers
+    ├── command_test/    # Test for command parsing
+    ├── pump_test/       # Standalone test for the water pump and L298N driver
+    ├── rgb_led_test/    # Test for the RGB LED
+    ├── wifi_test/       # Test for WiFi connectivity
+    └── rpi_serial_test.py # Python script for testing RPi serial communication
 ```
 
 ## Getting Started
